@@ -1,5 +1,6 @@
 import abc
 
+
 # un control package este format implicit din 3 componente membre
 # Fixed Header
 # Existent in acelasi format pentru toate tipurile de Control Packages
@@ -18,7 +19,6 @@ class IFixedHeader(metaclass=abc.ABCMeta):
     def setRemainingLength(self, remLength):
         pass
 
-
     @abc.abstractmethod
     def getType(self):
         pass
@@ -27,10 +27,10 @@ class IFixedHeader(metaclass=abc.ABCMeta):
     def getFlags(self):
         pass
 
-
     @abc.abstractmethod
     def getRemainingLength(self):
         pass
+
 
 # Variable Header
 # Continutul acestui camp depinde de tipul controlului:
@@ -41,11 +41,11 @@ class IFixedHeader(metaclass=abc.ABCMeta):
 # Va fi conceput din mai multe fielduri (un hashmap de valori)
 class IVariableHeader(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def addFieldName(self,fieldName):
+    def addFieldName(self, fieldName):
         pass
 
     @abc.abstractmethod
-    def setField(self,fieldName, value, fieldLength):
+    def setField(self, fieldName, value, fieldLength):
         pass
 
     @abc.abstractmethod
@@ -59,6 +59,7 @@ class IVariableHeader(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def getSize(self):
         pass
+
 
 # Payload
 # Camp care depinde de comanda:
@@ -86,25 +87,30 @@ class IPayload(metaclass=abc.ABCMeta):
     def getSize(self):
         pass
 
+
 # definim interfata pentru un control package
 class IControlPackage(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def getType(self):
         pass
+
     @abc.abstractmethod
     def getFixedHeader(self):
         pass
+
     @abc.abstractmethod
     def getVariableHeader(self):
         pass
+
     @abc.abstractmethod
     def getPayload(self):
         pass
 
+
 # Clasele concrete
 # Fixed Header = Acelasi pentru toate tipurile de pachete
 class FixedHeader(IFixedHeader):
-    def __init__(self, type=0, flags=0, remLength = 0):
+    def __init__(self, type=0, flags=0, remLength=0):
         self.setType(type)
         self.setFlags(flags);
         self.setRemainingLength(remLength);
@@ -113,7 +119,6 @@ class FixedHeader(IFixedHeader):
         if not type in range(0, 16):
             raise "type must be between 0 and 16"
         self.type = type;
-
 
     def setFlags(self, flags):
         if not flags in range(0, 16):
@@ -134,9 +139,12 @@ class FixedHeader(IFixedHeader):
 
     def __str__(self):
         myStr = "FixedHeader{\n"
-        myStr += "\t[" + str(self.type) + ", " + str(self.flags) + "]\n\t[" + str(self.remainingLength) + "]\n"
+        myStr += "\t[type -> " + str(self.type) + "]\n"
+        myStr += "\t[flags -> " + str(bin(self.flags)) + "]\n"
+        myStr += "\t[" + str(self.remainingLength) + "]\n"
         myStr += "}"
         return myStr
+
 
 # Variable header: are la baza un dictionar cu mai multe fielduri
 #   -> Acesta va fi construit de catre builder conform fiecarui tip de comanda
@@ -145,7 +153,7 @@ class VariableHeader(IVariableHeader):
         self.fields = {}
         self.sizes = {}
 
-    def addFieldName(self,fieldName):
+    def addFieldName(self, fieldName):
         self.fields[fieldName] = None
         self.sizes[fieldName] = 0
 
@@ -180,9 +188,13 @@ class VariableHeader(IVariableHeader):
             return myStr
         myStr += "\n"
         for key in self.fields:
-            myStr += "\t["  + str(key) + " -> " + str(self.fields[key]) + "]\n"
+            display_text = str(self.fields[key])
+            if isinstance(self.fields[key], str):
+                display_text = "\"" + display_text + "\""
+            myStr += "\t[" + str(key) + " -> " + display_text + "]\n"
         myStr += "}"
         return myStr
+
 
 # Payload: are la baza un dictionar cu mai multe fielduri
 class Payload(IPayload):
@@ -190,7 +202,7 @@ class Payload(IPayload):
         self.fields = {}
         self.sizes = {}
 
-    def addFieldName(self,fieldName):
+    def addFieldName(self, fieldName):
         self.fields[fieldName] = None
         self.sizes[fieldName] = 0
 
@@ -226,9 +238,13 @@ class Payload(IPayload):
 
         myStr += "\n"
         for key in self.fields:
-            myStr += "\t["  + str(key) + " -> " + str(self.fields[key]) + "]\n"
+            display_text = str(self.fields[key])
+            if isinstance(self.fields[key], str):
+                display_text = "\"" + display_text + "\""
+            myStr += "\t[" + str(key) + " -> " + display_text + "]\n"
         myStr += "}"
         return myStr
+
 
 # Generic control package that is used to describe all packages
 class ControlPackage(IControlPackage):
@@ -239,12 +255,16 @@ class ControlPackage(IControlPackage):
 
     def getType(self):
         return self.fixedHeader.getType()
+
     def getFixedHeader(self):
         return self.fixedHeader
+
     def getVariableHeader(self):
         return self.variableHeader
+
     def getPayload(self):
         return self.payload
+
     def __str__(self):
         myStr = str(self.getType()) + ":\n{\n"
         myStr += str(self.fixedHeader) + "\n"
@@ -285,7 +305,7 @@ def createConnectPackage():
     myPayload.setField("client_identifier_length", len("First Client"), 2)
     myPayload.setField("client_identifier", "First Client", len("First Client"))
 
-    #will flag
+    # will flag
     if varFlags[5] == "1":
         myPayload.addFieldName("will_topic_length")
         myPayload.addFieldName("will_topic")
@@ -297,30 +317,154 @@ def createConnectPackage():
         myPayload.setField("will_message_length", len("My will is to be awake"), 2)
         myPayload.setField("will_message", "My will is to be awake", len("My will is to be awake"))
 
-    #username
+    # username
     if varFlags[0] == "1":
         myPayload.addFieldName("username_length")
         myPayload.addFieldName("username")
         myPayload.setField("username_length", len("vladbatalan"), 2)
         myPayload.setField("username", "vladbatalan", len("vladbatalan"))
 
-        #pasword
+        # pasword
         if varFlags[1] == "1":
             myPayload.addFieldName("password_length")
             myPayload.addFieldName("password")
             myPayload.setField("password_length", len("surprise"), 2)
             myPayload.setField("password", "surprise", len("surprise"))
 
-
     return ControlPackage(myFixedHeader, myVarHeader, myPayload)
+
+
+# Fiecare commanda va avea cate un builder asignat
+class IPackageBuilder(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def reset(self):
+        pass
+
+    @abc.abstractmethod
+    def getPackage(self) -> IControlPackage:
+        pass
+
+
+class ConnectBuilder(IPackageBuilder):
+    def __init__(self):
+        self.fixedHeader = FixedHeader()
+        self.variableHeader = VariableHeader()
+        self.payload = Payload()
+
+        self.componentsGenerated = [False, False, False]
+
+    def reset(self):
+        self.fixedHeader = FixedHeader()
+        self.variableHeader = VariableHeader()
+        self.payload = Payload()
+
+        self.componentsGenerated = [False, False, False]
+        pass
+
+    def buildFixedHeader(self):
+        # type = 0001
+        self.fixedHeader.setType(1)
+        # flags = 0000 (reserved)
+        self.fixedHeader.setFlags(0)
+        # reset remaining length
+        self.fixedHeader.setRemainingLength(0)
+
+        self.componentsGenerated[0] = True
+
+    # connectFlags must be sent as string
+    def buildVariableHeader(self, connectFlags, keepAllive):
+        if not self.componentsGenerated[0]:
+            raise "CONNECT control package: You must first build the Fixed Header component!"
+        if not isinstance(connectFlags, str):
+            raise "Connect Flags of CONNECT control package must be delivered as string!"
+
+        # adding the required fields in order
+        self.variableHeader.addFieldName("protocol_name_length")
+        self.variableHeader.addFieldName("protocol_name")
+        self.variableHeader.addFieldName("level")
+        self.variableHeader.addFieldName("connect_flags")
+        self.variableHeader.addFieldName("keep_allive")
+
+        # modifying the fields
+        # standard protocol name
+        self.variableHeader.setField("protocol_name_length", 4, 2)
+        self.variableHeader.setField("protocol_name", "MQTT", len("MQTT"))
+
+        # standard level
+        self.variableHeader.setField("level", 4, 1)
+
+        # connect flags
+        # username(0) | password(1) | will retain(2) | will Qos(3 - 4) | will flag(5) | cleanSesion(6) | reserved(7)
+        self.variableHeader.setField("connect_flags", int(connectFlags, 2), 1)
+
+        # keep alive
+        self.variableHeader.setField("keep_allive", keepAllive, 2)
+
+        # update components number
+        self.componentsGenerated[1] = True
+
+    def buildPayload(self, clientId, willTopic="", willMessage="", username="", password=""):
+        if not self.componentsGenerated[1]:
+            raise "CONNECT control package: You must build the Variable Header component!"
+
+        self.payload.addFieldName("client_identifier_length")
+        self.payload.addFieldName("client_identifier")
+
+        # aici identificatorul de client nu admite toate caracterele
+        self.payload.setField("client_identifier_length", len(clientId), 2)
+        self.payload.setField("client_identifier", clientId, len(clientId))
+
+        # username(0) | password(1) | will retain(2) | will Qos(3 - 4) | will flag(5) | cleanSesion(6) | reserved(7)
+        flags = str(bin(self.variableHeader.getField("connect_flags")))[2:]
+        # will flag
+        if flags[5] == "1":
+            self.payload.addFieldName("will_topic_length")
+            self.payload.addFieldName("will_topic")
+            self.payload.setField("will_topic_length", len(willTopic), 2)
+            self.payload.setField("will_topic", willTopic, len(willTopic))
+
+            self.payload.addFieldName("will_message_length")
+            self.payload.addFieldName("will_message")
+            self.payload.setField("will_message_length", len(willMessage), 2)
+            self.payload.setField("will_message", willMessage, len(willMessage))
+
+        # username
+        if flags[0] == "1":
+            self.payload.addFieldName("username_length")
+            self.payload.addFieldName("username")
+            self.payload.setField("username_length", len(username), 2)
+            self.payload.setField("username", username, len(username))
+
+            # pasword
+            if flags[1] == "1":
+                self.payload.addFieldName("password_length")
+                self.payload.addFieldName("password")
+                self.payload.setField("password_length", len(password), 2)
+                self.payload.setField("password", "surprise", len("surprise"))
+
+        self.componentsGenerated[2] = True
+
+    def getPackage(self):
+        if not all(self.componentsGenerated):
+            raise "CONNECT control package: You must build all the components in this order (fixed header, variable header, payload)!"
+
+        # calculate the remaining size for the fixed header
+        remainingSize = self.variableHeader.getSize() + self.payload.getSize()
+        self.fixedHeader.setRemainingLength(remainingSize)
+
+        # realizez package-ul aferent
+        myPackage = ControlPackage(self.fixedHeader, self.variableHeader, self.payload)
+        return myPackage
 
 
 if __name__ == "__main__":
     types = ["REZERVED", "CONNECT", "CONNACK", "PUBLISH", "..."]
 
-    connectPkg = createConnectPackage()
-    print(str(connectPkg))
+    connectPackageBuilder = ConnectBuilder()
+    connectPackageBuilder.reset()
+    connectPackageBuilder.buildFixedHeader()
+    connectPackageBuilder.buildVariableHeader("11000000", 23)
+    connectPackageBuilder.buildPayload("1", username="vladbatalan", password="student")
+    connectControlPackage = connectPackageBuilder.getPackage()
 
-    print(connectPkg.getPayload().getField("non_existing"))
-
-
+    print(str(connectControlPackage))
