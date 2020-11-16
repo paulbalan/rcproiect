@@ -130,3 +130,197 @@ class ConnectBuilder(IPackageBuilder):
         # realizez package-ul aferent
         myPackage = ControlPackage(self.fixedHeader, self.variableHeader, self.payload)
         return myPackage
+
+
+class PubackBuilder(IPackageBuilder):
+    def __init__(self):
+        self.fixedHeader = FixedHeader()
+        self.variableHeader = VariableHeader()
+        self.payload = Payload()
+
+        # specific pentru Puback si Pubrel
+        self.nameString = "PUBACK"
+
+        self.componentsGenerated = [False, False, False]
+
+    def reset(self):
+        self.fixedHeader = FixedHeader()
+        self.variableHeader = VariableHeader()
+        self.payload = Payload()
+
+        self.componentsGenerated = [False, False, False]
+        pass
+
+    def buildFixedHeader(self, fixedHeader=None):
+        if fixedHeader is not None:
+            if fixedHeader.getType() != 4:
+                raise Exception("Type does not match with builder type!")
+            if fixedHeader.getFlags() != 0:
+                raise Exception("Flags do not match with builder specific flag types!")
+            if fixedHeader.getRemainingLength() != 2:
+                raise Exception("RemLength do not match with builder remLength!")
+            self.fixedHeader = fixedHeader
+        else:
+            # type = 0004
+            self.fixedHeader.setType(4)
+            # flags = 0000 (reserved)
+            self.fixedHeader.setFlags(0)
+            # reset remaining length
+            self.fixedHeader.setRemainingLength(2)
+
+        self.componentsGenerated[0] = True
+
+    # connectFlags must be sent as string
+    def buildVariableHeader(self, packetId):
+        if not self.componentsGenerated[0]:
+            raise Exception(self.nameString + " control package: You must first build the Fixed Header component!")
+
+        if not isinstance(packetId, int):
+            raise Exception("Packet Id MUST be integer!")
+
+        self.variableHeader.addFieldName("packet_id")
+        self.variableHeader.setField("packet_id", packetId, 2)
+
+        # update components number
+        self.componentsGenerated[1] = True
+
+    def buildPayload(self):
+        if not self.componentsGenerated[1]:
+            raise Exception(self.nameString + " control package: You must build the Variable Header component!")
+
+        # empty
+        self.componentsGenerated[2] = True
+
+    def getPackage(self):
+        if not all(self.componentsGenerated):
+            raise Exception(
+                self.nameString + " control package: You must build all the components in this order (fixed header, "
+                                  "variable header, payload)!")
+
+        # calculate the remaining size for the fixed header
+        # fixed remaining header
+
+        # realizez package-ul aferent
+        myPackage = ControlPackage(self.fixedHeader, self.variableHeader, self.payload)
+        return myPackage
+
+
+class PubrecBuilder(PubackBuilder):
+    def __init__(self):
+        super().__init__()
+        self.nameString = "PUBREC"
+
+    def buildFixedHeader(self, fixedHeader=None):
+        if fixedHeader is not None:
+            if fixedHeader.getType() != 5:
+                raise Exception("Type does not match with builder type!")
+            if fixedHeader.getFlags() != 0:
+                raise Exception("Flags do not match with builder specific flag types!")
+            if fixedHeader.getRemainingLength() != 2:
+                raise Exception("RemLength do not match with builder remLength!")
+            self.fixedHeader = fixedHeader
+        else:
+            # type = 0005
+            self.fixedHeader.setType(5)
+            # flags = 0000 (reserved)
+            self.fixedHeader.setFlags(0)
+            # reset remaining length
+            self.fixedHeader.setRemainingLength(2)
+
+        self.componentsGenerated[0] = True
+
+    def getPackage(self):
+        if not all(self.componentsGenerated):
+            raise Exception("PUBREC control package: You must build all the components in this order (fixed header, "
+                            "variable header, payload)!")
+
+        # calculate the remaining size for the fixed header
+        # fixed remaining header
+
+        # realizez package-ul aferent
+        myPackage = ControlPackage(self.fixedHeader, self.variableHeader, self.payload)
+        return myPackage
+
+
+class UnsubscribeBuilder(IPackageBuilder):
+    def __init__(self):
+        self.fixedHeader = FixedHeader()
+        self.variableHeader = VariableHeader()
+        self.payload = Payload()
+
+        self.componentsGenerated = [False, False, False]
+
+    def reset(self):
+        self.fixedHeader = FixedHeader()
+        self.variableHeader = VariableHeader()
+        self.payload = Payload()
+
+        self.componentsGenerated = [False, False, False]
+
+    def buildFixedHeader(self, fixedHeader=None):
+        if fixedHeader is not None:
+            if fixedHeader.getType() != 10:
+                raise Exception("Type does not match with builder type!")
+            if fixedHeader.getFlags() != 2:
+                raise Exception("Flags do not match with builder specific flag types!")
+            self.fixedHeader = fixedHeader
+        else:
+            # type = 1010
+            self.fixedHeader.setType(10)
+            # flags = 0010 (reserved)
+            self.fixedHeader.setFlags(2)
+            # reset remaining length
+            self.fixedHeader.setRemainingLength(0)
+
+        self.componentsGenerated[0] = True
+
+    # connectFlags must be sent as string
+    def buildVariableHeader(self, packetId):
+        if not self.componentsGenerated[0]:
+            raise Exception("UNSUBSCRIBE control package: You must first build the Fixed Header component!")
+        if not isinstance(packetId, int):
+            raise Exception("UNSUBSCRIBE Packet Id must be delivered as integer!")
+
+        self.variableHeader.addFieldName("packet_id")
+        self.variableHeader.setField("packet_id", packetId, 2)
+
+        # update components number
+        self.componentsGenerated[1] = True
+
+    def buildPayload(self, topics):
+        if not self.componentsGenerated[1]:
+            raise Exception("UNSUBSCRIBE control package: You must build the Variable Header component!")
+        if not isinstance(topics, list):
+            raise Exception("UNSUBSCRIBE control package: topics must be delivered as a list!")
+        if len(topics) == 0:
+            raise Exception("UNSUBSCRIBE control package: topics must contain at least one topic name!")
+        for topic in topics:
+            if not isinstance(topic, str):
+                raise Exception("UNSUBSCRIBE control package: topics' elements must be instances of string!")
+
+        # Adaugam topic-ul in Payload
+        index = 0
+        for topic in topics:
+            self.payload.addFieldName("topic_length_" + str(index))
+            self.payload.addFieldName("topic_content_" + str(index))
+
+            self.payload.setField("topic_length_" + str(index), len(topic), 2)
+            self.payload.setField("topic_content_" + str(index), topic, len(topic))
+
+            index = index + 1
+
+        self.componentsGenerated[2] = True
+
+    def getPackage(self):
+        if not all(self.componentsGenerated):
+            raise Exception(
+                "UNSUBSCRIBE control package: You must build all the components in this order (fixed header, "
+                "variable header, payload)!")
+
+        # calculate the remaining size for the fixed header
+        remainingSize = self.variableHeader.getSize() + self.payload.getSize()
+        self.fixedHeader.setRemainingLength(remainingSize)
+
+        # realizez package-ul aferent
+        myPackage = ControlPackage(self.fixedHeader, self.variableHeader, self.payload)
+        return myPackage

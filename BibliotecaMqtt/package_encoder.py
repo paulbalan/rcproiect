@@ -202,8 +202,157 @@ class ConnectDecoder(IPackageDecoder):
         return builder.getPackage()
 
 
+# Specific decoder for the PUBACK control package
+class PubackDecoder(IPackageDecoder):
+    def __init__(self):
+        pass
+
+    def getType(self) -> int:
+        return 4
+
+    # binaryString is the encoded string of the Variable Header and the Payload
+    def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
+        if self.getType() != fixedHeader.getType():
+            raise Exception("Type does not match!")
+        if len(binaryString) != 16:
+            raise Exception("Binary string too long!")
+
+        # initialise builder
+        builder = PubackBuilder()
+        builder.reset()
+        # build fixed Header
+        builder.buildFixedHeader(fixedHeader)
+
+        if not isinstance(binaryString, str):
+            binaryString = str(binaryString)
+            if binaryString[0:2] == '0b':
+                binaryString = binaryString[2:]
+
+        packet_id = int(binaryString[0:16], 2)
+
+        # build Variable Header
+        builder.buildVariableHeader(packet_id)
+
+        # build Payload
+        builder.buildPayload()
+
+        return builder.getPackage()
+
+
+# Specific decoder for the PUBREL control package
+class PubrecDecoder(IPackageDecoder):
+    def __init__(self):
+        pass
+
+    def getType(self) -> int:
+        return 5
+
+    # binaryString is the encoded string of the Variable Header and the Payload
+    def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
+        if self.getType() != fixedHeader.getType():
+            raise Exception("Type does not match!")
+        if len(binaryString) != 16:
+            raise Exception("Binary string too long!")
+
+        # initialise builder
+        builder = PubrecBuilder()
+        builder.reset()
+        # build fixed Header
+        builder.buildFixedHeader(fixedHeader)
+
+        if not isinstance(binaryString, str):
+            binaryString = str(binaryString)
+            if binaryString[0:2] == '0b':
+                binaryString = binaryString[2:]
+
+        packet_id = int(binaryString[0:16], 2)
+        binaryString = binaryString[16:]
+
+        # build Variable Header
+        builder.buildVariableHeader(packet_id)
+
+        # build Payload
+        builder.buildPayload()
+
+        return builder.getPackage()
+
+
+# Specific decoder for the CONNECT control package
+class UnsubscribeDecoder(IPackageDecoder):
+    def __init__(self):
+        pass
+
+    def getType(self) -> int:
+        return 10
+
+    # binaryString is the encoded string of the Variable Header and the Payload
+    def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
+        if self.getType() != fixedHeader.getType():
+            raise Exception("Type does not match!")
+
+        # initialise builder
+        builder = UnsubscribeBuilder()
+        builder.reset()
+        # build fixed Header
+        builder.buildFixedHeader(fixedHeader)
+
+        if not isinstance(binaryString, str):
+            binaryString = str(binaryString)
+            if binaryString[0:2] == '0b':
+                binaryString = binaryString[2:]
+
+        # observatie: pentru decodarea unui camp de format:
+        # byte0: MSB length
+        # byte1: LSB length
+        # byte2 ...: caractere
+        #           se va utiliza self.decodeField(binaryString)
+
+        # variable header components
+        # 1) protocol name
+        packet_id = int(binaryString[0:16], 2)
+        binaryString = binaryString[16:]
+
+        # build variable header
+        builder.buildVariableHeader(packet_id)
+
+        # payload components
+        # 1) topics
+        topics = []
+        while binaryString != "":
+            # ############################ AICI AR PUTEA APAREA EXCEPTII NETRATATE #########################
+            #                        Daca un binaryString nu are nr de biti cum trebuie?
+            binaryString, topic = self.decodeField(binaryString)
+            topics.append(topic)
+
+        # build Payload
+        builder.buildPayload(topics)
+
+        return builder.getPackage()
+
+
 # Pentru decodarea unui string, este necesara mai intai decodarea headerului pentru a afla
 #         cati biti mai trebuie cititi din buffer
+def decodeRemainingLength(remLengthBinaryStr) -> int:
+    multiplier = 1
+    value = 0
+
+    while True:
+        # extract encoded byte
+        encodedByte = int(remLengthBinaryStr[0:8], 2)
+        remLengthBinaryStr = remLengthBinaryStr[8:]
+
+        value += (encodedByte & 127) * multiplier
+        if multiplier > 128 * 128 * 128:
+            raise Exception("Malformed Remaining Length!")
+
+        multiplier *= 128
+
+        if encodedByte & 128 == 0:
+            break
+
+    return value
+
+
 class GenericPackageDecoder:
     def __init__(self):
         pass
@@ -224,33 +373,14 @@ class GenericPackageDecoder:
 
         fixedHeaderResult.setType(int(fixedHeaderString[0:4], 2))
         fixedHeaderResult.setFlags(int(fixedHeaderString[4:8], 2))
-        fixedHeaderResult.setRemainingLength(self.decodeRemainingLength(fixedHeaderString[8:]))
+        fixedHeaderResult.setRemainingLength(decodeRemainingLength(fixedHeaderString[8:]))
         return fixedHeaderResult
 
     # gets a string as an input
-    def decodeRemainingLength(self, remLengthBinaryStr) -> int:
-        multiplier = 1
-        value = 0
-
-        while True:
-            # extract encoded byte
-            encodedByte = int(remLengthBinaryStr[0:8], 2)
-            remLengthBinaryStr = remLengthBinaryStr[8:]
-
-            value += (encodedByte & 127) * multiplier
-            if multiplier > 128 * 128 * 128:
-                raise Exception("Malformed Remaining Length!")
-
-            multiplier *= 128
-
-            if encodedByte & 128 == 0:
-                break
-
-        return value
 
     def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
         # to be added one decoder foreach package type
-        decoders = [ConnectDecoder()]
+        decoders = [ConnectDecoder(), PubackDecoder(), PubrecDecoder(), UnsubscribeDecoder()]
 
         packageType = fixedHeader.getType()
 
@@ -263,4 +393,3 @@ class GenericPackageDecoder:
             raise Exception("Type of package unknown!")
 
         return decoder.decodeVariableComponents(binaryString, fixedHeader)
-

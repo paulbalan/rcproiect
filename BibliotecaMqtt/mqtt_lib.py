@@ -4,27 +4,29 @@ from package_encoder import *
 
 
 if __name__ == "__main__":
+    builder = UnsubscribeBuilder()
+    builder.reset()
+    builder.buildFixedHeader()
+    builder.buildVariableHeader(25)
+    builder.buildPayload(["Electrocasnice", "Masini", "Gaming"])
 
-    connectPackageBuilder = ConnectBuilder()
-    connectPackageBuilder.reset()
-    connectPackageBuilder.buildFixedHeader()
-    connectPackageBuilder.buildVariableHeader("11000100", 20)
-    connectPackageBuilder.buildPayload("Client - 1", username="vladbatalan", password="betivaneala",
-                                       willTopic="register", willMessage="display credentials")
-    connectControlPackage = connectPackageBuilder.getPackage()
+    unsubscribe = builder.getPackage()
 
-    print("Original package:")
-    print(str(connectControlPackage))
+    print(str(unsubscribe))
 
-    myEncoder = GenericPackageEncoder()
-    myDecoder = GenericPackageDecoder()
-    text = myEncoder.encode(connectControlPackage)
-    print("Encoded package:")
-    displayControlPackageBinary(text)
+    encoder = GenericPackageEncoder()
+    encodedText = encoder.encode(unsubscribe)
 
-    decodedPackage = myDecoder.decodeVariableComponents(text[16:], myDecoder.decodeFixedHeader(text[0:16]))
-    print("Decoded Package:")
-    print(str(decodedPackage))
+    displayControlPackageBinary(encodedText)
 
-    if str(connectControlPackage) == str(decodedPackage):
-        print("There is a match!")
+    decoder = GenericPackageDecoder()
+    header = decoder.decodeFixedHeader(encodedText[0:16])
+    unsubscribe_decoded = decoder.decodeVariableComponents(encodedText[16:], header)
+
+    print(str(unsubscribe_decoded))
+
+    if str(unsubscribe) == str(unsubscribe_decoded):
+        print("We got a match!")
+
+
+
