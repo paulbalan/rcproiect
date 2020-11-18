@@ -268,10 +268,13 @@ class SubscribeBuilder(IPackageBuilder):
         for topic in topics:
             if not isinstance(topic, str):
                 raise Exception("SUBSCRIBE control package: topics' elements must be instances of string!")
-        if (0 >= QoS >= 2):
-                raise Exception("SUBSCRIBE control package: QoS unknown")
-
-
+        if not isinstance(QoS ,list):
+            raise Exception("SUBSCRIBE control package: QoS must be a list")
+        for code in QoS:
+            if not code in [0,1,2]:
+                raise Exception("SUBSCRIBE control package : QoS code not valid: "+str(code))
+        if len(topics) != len(QoS):
+            raise Exception("SUBSCRIBE control package: number of topics isn't equal to the number of QoS ")
 
 
         # Adaugam topic-ul in Payload
@@ -279,14 +282,13 @@ class SubscribeBuilder(IPackageBuilder):
         for topic in topics:
             self.payload.addFieldName("topic_length_" + str(index))
             self.payload.addFieldName("topic_content_" + str(index))
+            self.payload.addFieldName("requested_qos_" +str(index))
 
             self.payload.setField("topic_length_" + str(index), len(topic), 2)
             self.payload.setField("topic_content_" + str(index), topic, len(topic))
-
+            self.payload.setField("requested_qos_"+str(index), QoS[index], 1)
             index = index + 1
 
-        self.payload.addFieldName("requested_qos")
-        self.payload.setField("requested_qos",QoS,1)
 
         self.componentsGenerated[2] = True
 

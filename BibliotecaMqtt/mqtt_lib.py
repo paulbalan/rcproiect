@@ -4,11 +4,11 @@ from package_encoder import *
 
 
 if __name__ == "__main__":
-    builder = SubackBuilder()
+    builder = SubscribeBuilder()
     builder.reset()
     builder.buildFixedHeader()
     builder.buildVariableHeader(10)
-    builder.buildPayload([12,36])
+    builder.buildPayload(["Gaming","Aircraft"],[1,0])
 
     connack = builder.getPackage()
 

@@ -200,8 +200,6 @@ class ConnectDecoder(IPackageDecoder):
                              willMessage=will_message, username=username, password=password)
 
         return builder.getPackage()
-
-
 # Specific decoder for the CONNACK control package
 class ConnackDecoder(IPackageDecoder):
     def __init__(self):
@@ -238,8 +236,6 @@ class ConnackDecoder(IPackageDecoder):
         builder.buildPayload()
 
         return builder.getPackage()
-
-
 # Specific decoder for the PUBACK control package
 class PubackDecoder(IPackageDecoder):
     def __init__(self):
@@ -275,8 +271,6 @@ class PubackDecoder(IPackageDecoder):
         builder.buildPayload()
 
         return builder.getPackage()
-
-
 # Specific decoder for the PUBREL control package
 class PubrecDecoder(IPackageDecoder):
     def __init__(self):
@@ -470,13 +464,16 @@ class SubscribeDecoder(IPackageDecoder):
         builder.buildVariableHeader(packet_id)
 
         topics = []
-        while len(binaryString) != 8:
+        qos=[]
+        while binaryString !="":
             # ############################ AICI AR PUTEA APAREA EXCEPTII NETRATATE #########################
             #                        Daca un binaryString nu are nr de biti cum trebuie?
             binaryString, topic = self.decodeField(binaryString)
             topics.append(topic)
+            code=int(binaryString[0:8],2)
+            qos.append(code)
+            binaryString=binaryString[8:]
 
-        qos=int(binaryString,2)
 
         # build Payload
         builder.buildPayload(topics,qos)
