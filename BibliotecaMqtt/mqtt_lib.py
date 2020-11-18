@@ -4,28 +4,28 @@ from package_encoder import *
 
 
 if __name__ == "__main__":
-    builder = UnsubscribeBuilder()
+    builder = SubackBuilder()
     builder.reset()
     builder.buildFixedHeader()
-    builder.buildVariableHeader(25)
-    builder.buildPayload(["Electrocasnice", "Masini", "Gaming"])
+    builder.buildVariableHeader(10)
+    builder.buildPayload([12,36])
 
-    unsubscribe = builder.getPackage()
+    connack = builder.getPackage()
 
-    print(str(unsubscribe))
+    print(str(connack))
 
     encoder = GenericPackageEncoder()
-    encodedText = encoder.encode(unsubscribe)
+    encodedText = encoder.encode(connack)
 
     displayControlPackageBinary(encodedText)
 
     decoder = GenericPackageDecoder()
     header = decoder.decodeFixedHeader(encodedText[0:16])
-    unsubscribe_decoded = decoder.decodeVariableComponents(encodedText[16:], header)
+    connack_decoded = decoder.decodeVariableComponents(encodedText[16:], header)
 
-    print(str(unsubscribe_decoded))
+    print(str(connack_decoded))
 
-    if str(unsubscribe) == str(unsubscribe_decoded):
+    if str(connack) == str(connack_decoded):
         print("We got a match!")
 
 
