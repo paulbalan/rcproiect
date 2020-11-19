@@ -550,6 +550,192 @@ def decodeRemainingLength(remLengthBinaryStr) -> int:
     return value
 
 
+# Specific decoder for the DISCONNECT control package
+class DisconnectDecoder(IPackageDecoder):
+    def __init__(self):
+        pass
+
+    def getType(self) -> int:
+        return 14
+
+    # binaryString is the encoded string of the Variable Header and the Payload
+    def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
+        if self.getType() != fixedHeader.getType():
+            raise Exception("Type does not match!")
+
+        # initialise builder
+        builder = DisconnectBuilder()
+        builder.reset()
+        # build fixed Header
+        builder.buildFixedHeader(fixedHeader)
+
+        if not isinstance(binaryString, str):
+            binaryString = str(binaryString)
+            if binaryString[0:2] == '0b':
+                binaryString = binaryString[2:]
+        if len(binaryString) != 0:
+            raise Exception("Binary string too long!")
+
+        # build Variable Header
+        builder.buildVariableHeader()
+
+        # build Payload
+        builder.buildPayload()
+
+        return builder.getPackage()
+
+
+# Specific decoder for the PINGRESP control package
+class PingrespDecoder(IPackageDecoder):
+    def __init__(self):
+        pass
+
+    def getType(self) -> int:
+        return 13
+
+    # binaryString is the encoded string of the Variable Header and the Payload
+    def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
+        if self.getType() != fixedHeader.getType():
+            raise Exception("Type does not match!")
+
+        # initialise builder
+        builder = PingrespBuilder()
+        builder.reset()
+        # build fixed Header
+        builder.buildFixedHeader(fixedHeader)
+
+        if not isinstance(binaryString, str):
+            binaryString = str(binaryString)
+            if binaryString[0:2] == '0b':
+                binaryString = binaryString[2:]
+        if len(binaryString) != 0:
+            raise Exception("Binary string too long!")
+
+        # build Variable Header
+        builder.buildVariableHeader()
+
+        # build Payload
+        builder.buildPayload()
+
+        return builder.getPackage()
+
+# Specific decoder for the PINGRESP control package
+class UnsubackDecoder(IPackageDecoder):
+    def __init__(self):
+        pass
+
+    def getType(self) -> int:
+        return 11
+
+    # binaryString is the encoded string of the Variable Header and the Payload
+    def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
+        if self.getType() != fixedHeader.getType():
+            raise Exception("Type does not match!")
+
+        # initialise builder
+        builder = UnsubackBuilder()
+        builder.reset()
+        # build fixed Header
+        builder.buildFixedHeader(fixedHeader)
+
+        if not isinstance(binaryString, str):
+            binaryString = str(binaryString)
+            if binaryString[0:2] == '0b':
+                binaryString = binaryString[2:]
+
+
+        packetId = int(binaryString, 2)
+
+        # build Variable Header
+        builder.buildVariableHeader(packetId)
+
+        # build Payload
+        builder.buildPayload()
+
+        return builder.getPackage()
+
+
+class PubrelDecoder(IPackageDecoder):
+    def __init__(self):
+        pass
+
+    def getType(self) -> int:
+        return 5
+
+    # binaryString is the encoded string of the Variable Header and the Payload
+    def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
+        if self.getType() != fixedHeader.getType():
+            raise Exception("Type does not match!")
+
+        # initialise builder
+        builder = PubrelBuilder()
+        builder.reset()
+        # build fixed Header
+        builder.buildFixedHeader(fixedHeader)
+
+        if not isinstance(binaryString, str):
+            binaryString = str(binaryString)
+            if binaryString[0:2] == '0b':
+                binaryString = binaryString[2:]
+
+
+        packetId = int(binaryString, 2)
+
+        # build Variable Header
+        builder.buildVariableHeader(packetId)
+
+        # build Payload
+        builder.buildPayload()
+
+        return builder.getPackage()
+
+
+class PublishDecoder(IPackageDecoder):
+    def __init__(self):
+        pass
+
+    def getType(self) -> int:
+        return 3
+
+    # binaryString is the encoded string of the Variable Header and the Payload
+    def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
+        if self.getType() != fixedHeader.getType():
+            raise Exception("Type does not match!")
+
+        # initialise builder
+        builder = PublishBuilder()
+        builder.reset()
+        # build fixed Header
+
+        #parse the flags
+        binaryFlags = '{0:04b}'.format(fixedHeader.getFlags())
+        DUP = int(binaryFlags[0], 2)
+        QoS = int(binaryFlags[1:3], 2)
+        RETAIN = int(binaryFlags[3], 2)
+
+        #call the buildFixedHeader builder
+        builder.buildFixedHeader(DUP=DUP, QoS=QoS, RETAIN=RETAIN)
+
+        if not isinstance(binaryString, str):
+            binaryString = str(binaryString)
+            if binaryString[0:2] == '0b':
+                binaryString = binaryString[2:]
+
+        # build variable header
+        builder.buildVariableHeader()
+
+        #application message in binary
+        appMessgBin = binaryString[56:]
+
+        #application message in plain text
+        applicationMessage = int(appMessgBin, 2).to_bytes((int(appMessgBin, 2).bit_length() + 7) // 8, 'big').decode()
+
+        # build Payload
+        builder.buildPayload(applicationMessage)
+
+        return builder.getPackage()
+
+
 class GenericPackageDecoder:
     def __init__(self):
         pass
@@ -579,7 +765,9 @@ class GenericPackageDecoder:
         # to be added one decoder foreach package type
         decoders = [ConnectDecoder(), PubackDecoder(), PubrecDecoder(),
                     UnsubscribeDecoder(),ConnackDecoder(),PingreqDecoder(),
-                    PubcompDecoder(),SubscribeDecoder(),SubackDecoder()]
+                    PubcompDecoder(),SubscribeDecoder(),SubackDecoder(),
+                    DisconnectDecoder(), PingrespDecoder(), UnsubackDecoder(),
+                    PubrelDecoder(), PublishDecoder()]
 
         packageType = fixedHeader.getType()
 
