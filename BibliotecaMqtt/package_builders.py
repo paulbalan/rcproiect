@@ -974,12 +974,10 @@ class PublishBuilder(IPackageBuilder):
     # dup = 0/1
     # qos = 0/1/2/null
     # retain = 0/1
-    def buildFixedHeader(self, DUP, QoS, RETAIN, fixedHeader=None):
+    def buildFixedHeader(self, DUP='', QoS='', RETAIN='', fixedHeader=None):
         if fixedHeader is not None:
             if fixedHeader.getType() != 3:
                 raise Exception("Type does not match with builder type!")
-            if fixedHeader.getFlags() != 0:
-                raise Exception("Flags do not match with builder specific flag types!")
 
             self.fixedHeader = fixedHeader
         else:
@@ -994,7 +992,7 @@ class PublishBuilder(IPackageBuilder):
         self.componentsGenerated[0] = True
 
     # connectFlags must be sent as string
-    def buildVariableHeader(self):
+    def buildVariableHeader(self, topic):
         if not self.componentsGenerated[0]:
             raise Exception("Publish control package: You must first build the Fixed Header component!")
 
@@ -1005,8 +1003,8 @@ class PublishBuilder(IPackageBuilder):
 
         # modifying the fields
         # standard protocol name
-        self.variableHeader.setField("topic_name_length", 3, 2)
-        self.variableHeader.setField("topic_name", "a/b", len("a/b"))
+        self.variableHeader.setField("topic_name_length", len(topic), 2)
+        self.variableHeader.setField("topic_name", topic, len(topic))
         self.variableHeader.setField("packet_identifier", 10, 2)
 
         # update components number

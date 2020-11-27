@@ -706,23 +706,19 @@ class PublishDecoder(IPackageDecoder):
         builder = PublishBuilder()
         builder.reset()
         # build fixed Header
-
-        #parse the flags
-        binaryFlags = '{0:04b}'.format(fixedHeader.getFlags())
-        DUP = int(binaryFlags[0], 2)
-        QoS = int(binaryFlags[1:3], 2)
-        RETAIN = int(binaryFlags[3], 2)
-
-        #call the buildFixedHeader builder
-        builder.buildFixedHeader(DUP=DUP, QoS=QoS, RETAIN=RETAIN)
+        builder.buildFixedHeader(fixedHeader=fixedHeader)
 
         if not isinstance(binaryString, str):
             binaryString = str(binaryString)
             if binaryString[0:2] == '0b':
                 binaryString = binaryString[2:]
 
+        topicNameLenght = int(binaryString[0:16], 2)
+        topicNameBinary = binaryString[16:(8 * topicNameLenght) + 16]
+        topicName = int(topicNameBinary, 2).to_bytes((int(topicNameBinary, 2).bit_length() + 7) // 8, 'big').decode()
+
         # build variable header
-        builder.buildVariableHeader()
+        builder.buildVariableHeader(topicName)
 
         #application message in binary
         appMessgBin = binaryString[56:]

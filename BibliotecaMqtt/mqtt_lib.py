@@ -7,7 +7,7 @@ if __name__ == "__main__":
     builder = PublishBuilder()
     builder.reset()
     builder.buildFixedHeader(1, 3, 0)
-    builder.buildVariableHeader()
+    builder.buildVariableHeader("abc")
     builder.buildPayload("salut")
 
     connack = builder.getPackage()
