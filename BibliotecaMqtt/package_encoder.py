@@ -3,7 +3,30 @@ import binascii
 from package_builders import *
 
 
+def str_to_binary(binaryString) -> bytearray:
+    myArray = bytearray()
+    for index in range(0, len(binaryString), 8):
+        myArray.append(int(binaryString[index:index + 8], 2))
+    return myArray
+
+
+def binary_to_str(binaryCode) -> str:
+    binaryString = ""
+    for binChar in binaryCode:
+        value = int(str(binChar))
+
+        for index in range(7, -1, -1):
+            if (value & pow(2, index)) > 0:
+                binaryString += '1'
+            else:
+                binaryString += '0'
+    return binaryString
+
+
 def displayControlPackageBinary(encodedStr, file=None):
+    # if not isinstance(encodedStr, str):
+    # encodedStr = str(encodedStr)[2:-1]
+
     for index in range(0, len(encodedStr), 8):
         chunk = encodedStr[index:index + 8] + "("
         if 32 <= int(encodedStr[index:index + 8], 2) < 128:
@@ -24,6 +47,9 @@ class GenericPackageEncoder:
 
         # encode the header of the control package
         fixedHeader = controlPackage.getFixedHeader()
+
+        type = fixedHeader.getType()
+
         encodedString += format(fixedHeader.getType(), '04b')
         encodedString += format(fixedHeader.getFlags(), '04b')
         remLengthEnc = self.encodeRemainingLength(fixedHeader.getRemainingLength())
@@ -51,6 +77,17 @@ class GenericPackageEncoder:
         # encode the payload
         payload = controlPackage.getPayload()
 
+        # caz special pt publish
+        """
+        if type == 3:
+            for field in payload.getAllFields():
+                value = payload.getAllFields()[field]
+                # is string -> encode every char
+                if isinstance(value, str):
+                    for char in value:
+                        encodedString += format(ord(char), '08b')
+
+        else:"""
         for field in payload.getAllFields():
             value = payload.getAllFields()[field]
             # is string -> encode every char
@@ -61,12 +98,10 @@ class GenericPackageEncoder:
                 # is integer
                 # little endian encoding
                 fieldSize = payload.getFieldSize(field)
-
                 for index in range(fieldSize - 1, -1, -1):
                     mask = 0xFF << (index * 8)
                     currentByte = (value & mask) >> (index * 8)
                     encodedString += format(currentByte, '08b')
-
         return encodedString
 
     # functie care primeste un int si il decodifica pentru a genera remaining length
@@ -200,6 +235,8 @@ class ConnectDecoder(IPackageDecoder):
                              willMessage=will_message, username=username, password=password)
 
         return builder.getPackage()
+
+
 # Specific decoder for the CONNACK control package
 class ConnackDecoder(IPackageDecoder):
     def __init__(self):
@@ -227,7 +264,7 @@ class ConnackDecoder(IPackageDecoder):
             raise Exception("Binary string too long!")
 
         SP = int(binaryString[7])
-        connectReturnCode = int(binaryString[8:16],2)
+        connectReturnCode = int(binaryString[8:16], 2)
 
         # build Variable Header
         builder.buildVariableHeader(SP, connectReturnCode)
@@ -236,6 +273,8 @@ class ConnackDecoder(IPackageDecoder):
         builder.buildPayload()
 
         return builder.getPackage()
+
+
 # Specific decoder for the PUBACK control package
 class PubackDecoder(IPackageDecoder):
     def __init__(self):
@@ -271,6 +310,8 @@ class PubackDecoder(IPackageDecoder):
         builder.buildPayload()
 
         return builder.getPackage()
+
+
 # Specific decoder for the PUBREL control package
 class PubrecDecoder(IPackageDecoder):
     def __init__(self):
@@ -361,6 +402,7 @@ class UnsubscribeDecoder(IPackageDecoder):
 
         return builder.getPackage()
 
+
 # Specific decoder for the PINGREQ control package
 class PingreqDecoder(IPackageDecoder):
     def __init__(self):
@@ -373,7 +415,6 @@ class PingreqDecoder(IPackageDecoder):
     def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
         if self.getType() != fixedHeader.getType():
             raise Exception("Type does not match!")
-
 
         # initialise builder
         builder = PingreqBuilder()
@@ -388,7 +429,6 @@ class PingreqDecoder(IPackageDecoder):
         if len(binaryString) != 0:
             raise Exception("Binary string too long!")
 
-
         # build Variable Header
         builder.buildVariableHeader()
 
@@ -396,6 +436,8 @@ class PingreqDecoder(IPackageDecoder):
         builder.buildPayload()
 
         return builder.getPackage()
+
+
 # Specific decoder for the PUBCOMP control package
 class PubcompDecoder(IPackageDecoder):
     def __init__(self):
@@ -408,7 +450,6 @@ class PubcompDecoder(IPackageDecoder):
     def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
         if self.getType() != fixedHeader.getType():
             raise Exception("Type does not match!")
-
 
         # initialise builder
         builder = PubcompBuilder()
@@ -423,7 +464,7 @@ class PubcompDecoder(IPackageDecoder):
         if len(binaryString) != 16:
             raise Exception("Binary string too long!")
 
-        packetId=int(binaryString,2)
+        packetId = int(binaryString, 2)
 
         # build Variable Header
         builder.buildVariableHeader(packetId)
@@ -432,6 +473,8 @@ class PubcompDecoder(IPackageDecoder):
         builder.buildPayload()
 
         return builder.getPackage()
+
+
 # Specific decoder for the SUBSCRIBE control package
 class SubscribeDecoder(IPackageDecoder):
     def __init__(self):
@@ -444,7 +487,6 @@ class SubscribeDecoder(IPackageDecoder):
     def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
         if self.getType() != fixedHeader.getType():
             raise Exception("Type does not match!")
-
 
         # initialise builder
         builder = SubscribeBuilder()
@@ -464,21 +506,22 @@ class SubscribeDecoder(IPackageDecoder):
         builder.buildVariableHeader(packet_id)
 
         topics = []
-        qos=[]
-        while binaryString !="":
+        qos = []
+        while binaryString != "":
             # ############################ AICI AR PUTEA APAREA EXCEPTII NETRATATE #########################
             #                        Daca un binaryString nu are nr de biti cum trebuie?
             binaryString, topic = self.decodeField(binaryString)
             topics.append(topic)
-            code=int(binaryString[0:8],2)
+            code = int(binaryString[0:8], 2)
             qos.append(code)
-            binaryString=binaryString[8:]
-
+            binaryString = binaryString[8:]
 
         # build Payload
-        builder.buildPayload(topics,qos)
+        builder.buildPayload(topics, qos)
 
         return builder.getPackage()
+
+
 # Specific decoder for the SUBACK control package
 class SubackDecoder(IPackageDecoder):
     def __init__(self):
@@ -492,7 +535,6 @@ class SubackDecoder(IPackageDecoder):
         if self.getType() != fixedHeader.getType():
             raise Exception("Type does not match!")
 
-
         # initialise builder
         builder = SubackBuilder()
         builder.reset()
@@ -504,9 +546,8 @@ class SubackDecoder(IPackageDecoder):
             if binaryString[0:2] == '0b':
                 binaryString = binaryString[2:]
 
-
-        packetId=int(binaryString[0:16] , 2)
-        binaryString=binaryString[16:]
+        packetId = int(binaryString[0:16], 2)
+        binaryString = binaryString[16:]
 
         # build Variable Header
         builder.buildVariableHeader(packetId)
@@ -519,13 +560,14 @@ class SubackDecoder(IPackageDecoder):
 
             code = int(binaryString[0:8], 2)
 
-            binaryString=binaryString[8:]
+            binaryString = binaryString[8:]
             codes.append(code)
 
         # build Payload
         builder.buildPayload(codes)
 
         return builder.getPackage()
+
 
 # Pentru decodarea unui string, este necesara mai intai decodarea headerului pentru a afla
 #         cati biti mai trebuie cititi din buffer
@@ -619,6 +661,7 @@ class PingrespDecoder(IPackageDecoder):
 
         return builder.getPackage()
 
+
 # Specific decoder for the PINGRESP control package
 class UnsubackDecoder(IPackageDecoder):
     def __init__(self):
@@ -642,7 +685,6 @@ class UnsubackDecoder(IPackageDecoder):
             binaryString = str(binaryString)
             if binaryString[0:2] == '0b':
                 binaryString = binaryString[2:]
-
 
         packetId = int(binaryString, 2)
 
@@ -678,7 +720,6 @@ class PubrelDecoder(IPackageDecoder):
             if binaryString[0:2] == '0b':
                 binaryString = binaryString[2:]
 
-
         packetId = int(binaryString, 2)
 
         # build Variable Header
@@ -713,18 +754,27 @@ class PublishDecoder(IPackageDecoder):
             if binaryString[0:2] == '0b':
                 binaryString = binaryString[2:]
 
-        topicNameLenght = int(binaryString[0:16], 2)
-        topicNameBinary = binaryString[16:(8 * topicNameLenght) + 16]
-        topicName = int(topicNameBinary, 2).to_bytes((int(topicNameBinary, 2).bit_length() + 7) // 8, 'big').decode()
+        binaryString, topicName = self.decodeField(binaryString)
+
+        # get the Qos field of the fixed header
+        flags = bin(fixedHeader.getFlags()).format('04b')[2:]
+        Qos = flags[1:3]
+        idPackage = 0
+
+        if Qos != '00':
+            idPackage = int(binaryString[0:16], 2)
+            binaryString = binaryString[16:]
 
         # build variable header
-        builder.buildVariableHeader(topicName)
+        builder.buildVariableHeader(topicName, idPackage)
 
-        #application message in binary
-        appMessgBin = binaryString[56:]
+        # application message in binary
+        bytesLeft = format(len(binaryString) // 8, '016b')
 
-        #application message in plain text
-        applicationMessage = int(appMessgBin, 2).to_bytes((int(appMessgBin, 2).bit_length() + 7) // 8, 'big').decode()
+        binaryString = bytesLeft + binaryString
+
+        # application message in plain text
+        binaryString, applicationMessage = self.decodeField(binaryString)
 
         # build Payload
         builder.buildPayload(applicationMessage)
@@ -760,8 +810,8 @@ class GenericPackageDecoder:
     def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
         # to be added one decoder foreach package type
         decoders = [ConnectDecoder(), PubackDecoder(), PubrecDecoder(),
-                    UnsubscribeDecoder(),ConnackDecoder(),PingreqDecoder(),
-                    PubcompDecoder(),SubscribeDecoder(),SubackDecoder(),
+                    UnsubscribeDecoder(), ConnackDecoder(), PingreqDecoder(),
+                    PubcompDecoder(), SubscribeDecoder(), SubackDecoder(),
                     DisconnectDecoder(), PingrespDecoder(), UnsubackDecoder(),
                     PubrelDecoder(), PublishDecoder()]
 

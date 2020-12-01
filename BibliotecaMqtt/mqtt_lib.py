@@ -6,8 +6,8 @@ from package_encoder import *
 if __name__ == "__main__":
     builder = PublishBuilder()
     builder.reset()
-    builder.buildFixedHeader(1, 3, 0)
-    builder.buildVariableHeader("abc")
+    builder.buildFixedHeader(DUP=1, QoS=3, RETAIN=0)
+    builder.buildVariableHeader(topic="/boss", packetId=50245)
     builder.buildPayload("salut")
 
     connack = builder.getPackage()
