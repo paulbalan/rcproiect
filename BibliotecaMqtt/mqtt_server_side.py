@@ -149,7 +149,7 @@ if __name__ == "__main__":
     client = ClientMQTT(address)
     client.connect("10000110", 0, username=username, willTopic="/register",
                    willMessage="Hello everyone! I am " + username)
-    client.subscribe(["/result", "/porn"], [2, 1])
+    client.subscribe(["/result", "/buldozer"], [2, 1])
 
     start_key = input("Start? PressKet = Any ...\n")
     #client.receive_thread.start()
