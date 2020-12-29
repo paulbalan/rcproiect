@@ -296,7 +296,7 @@ class SubscribeBuilder(IPackageBuilder):
 
     def getPackage(self):
         if not all(self.componentsGenerated):
-            raise Exception("PUBCOMP control package: You must build all the components in this order (fixed header, "
+            raise Exception("SUBSCRIBE control package: You must build all the components in this order (fixed header, "
                             "variable header, payload)!")
 
         # calculate the remaining size for the fixed header

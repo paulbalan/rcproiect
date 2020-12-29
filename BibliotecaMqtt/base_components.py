@@ -96,6 +96,14 @@ class IPayload(metaclass=abc.ABCMeta):
     def getSize(self):
         pass
 
+    @abc.abstractmethod
+    def getAllFields(self):
+        pass
+
+    @abc.abstractmethod
+    def getAllSizes(self):
+        pass
+
 
 # definim interfata pentru un control package
 class IControlPackage(metaclass=abc.ABCMeta):
