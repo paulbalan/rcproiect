@@ -3,6 +3,7 @@ import socket
 import random
 import string
 import threading
+import time
 
 
 # Acest module foloseste socketuri pentru a facilita
@@ -51,7 +52,9 @@ class SenderReceiver:
 class ClientMQTT:
     def __init__(self, addr):
         self.isConnected = False
+        self.loop_flag = False
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.conn.settimeout(1)
         self.transmitter = SenderReceiver(self.conn)
 
         self.packedId = 0
@@ -63,9 +66,37 @@ class ClientMQTT:
 
         self.clientId = result_str
 
+        self.topic_callbacks = {}
+
         print("Client trying to get the Broker socket ...")
         self.conn.connect(addr)
         print("Broker socket aquired.")
+
+        self.recv_thread = threading.Thread(target=self.receive_constantly)
+
+    def loop(self):
+        # create separate thread that receive all packages
+        if self.loop_flag is False:
+            self.loop_flag = True
+            self.recv_thread.start()
+
+    def receive_constantly(self):
+        while self.loop_flag is True:
+            if self.loop_flag is True:
+                # print("Prepare to receive ...")
+                try:
+                    package = self.transmitter.receivePackage()
+                    print("Received Package Type = " + package.getType())
+
+                    # PUBLISH PACKAGE
+                    if package.getType() == 3:
+                        # get the topic and run callback
+                        topic = package.getVariableHeader().getField("topic_name")
+                        if topic in self.topic_callbacks.keys():
+                            threading.Thread(target=self.topic_callbacks[topic], args=[package]).start()
+
+                except:
+                    pass
 
     def connect(self, flags, keep_alive, username='', password='', willTopic='', willMessage=''):
 
@@ -91,7 +122,8 @@ class ClientMQTT:
         else:
             print("Connection failed! Return code = " + str(return_code))
 
-    def subscribe(self, topics, QoS):
+    # callback must have a parameter for the packet received!
+    def subscribe(self, topics, QoS, callback):
         if isinstance(topics, str):
             topics = [topics]
         if isinstance(QoS, str):
@@ -124,6 +156,32 @@ class ClientMQTT:
             else:
                 print("\tResult = SUCCESS")
                 print("\tQos admitted = " + str(return_code))
+                self.topic_callbacks[topics[index]] = callback
+                print("Current callbacks: " + str(self.topic_callbacks))
+
+    def publish(self, topic, message, QoS):
+        self.packedId += 1
+
+        # create connect package
+        builder = PublishBuilder()
+        builder.reset()
+        builder.buildFixedHeader(DUP=1, QoS=QoS, RETAIN=0)
+        builder.buildVariableHeader(topic=topic, packetId=self.packedId)
+        builder.buildPayload(message)
+
+        publishPackage = builder.getPackage()
+        self.transmitter.sendPackage(publishPackage)
+
+        if QoS != 0:
+            # astept sa primesc confirmare
+            while True:
+                try:
+                    pubAck = self.transmitter.receivePackage()
+                    if pubAck.getType() in [4, 5]:
+                        print("Message( " + message + " ) was susscessfully sent to \"" + topic + "\"!")
+                    break
+                except:
+                    pass
 
     def disconnect(self):
         # create disconnect
@@ -134,8 +192,17 @@ class ClientMQTT:
         builder.buildPayload()
         disconnectPackage = builder.getPackage()
 
+        if self.loop_flag is True:
+            self.loop_flag = False
+            self.recv_thread.join()
         self.transmitter.sendPackage(disconnectPackage)
         print("Client disconnected!")
+
+
+def publish_get(publish_package):
+    topic_name = publish_package.getVariableHeader().getField("topic_name")
+    message = publish_package.getPayload().getField("application_message")
+    print("(Received)" + topic_name + ": " + message)
 
 
 if __name__ == "__main__":
@@ -147,12 +214,19 @@ if __name__ == "__main__":
     username = input("Username = ")
 
     client = ClientMQTT(address)
-    client.connect("10000110", 0, username=username, willTopic="/register",
+    client.connect(flags="10000000", keep_alive=10, username=username, willTopic="/register",
                    willMessage="Hello everyone! I am " + username)
-    client.subscribe(["/result", "/buldozer"], [2, 1])
+    client.subscribe(["/register", "/fire"], [2, 2], publish_get)
 
-    start_key = input("Start? PressKet = Any ...\n")
-    #client.receive_thread.start()
-    exit_key = input("Exit? PressKey = Any ...\n")
+    client.loop()
+    time.sleep(3)
+    while True:
+        command_key = input("Command = ")
+        if command_key == "exit":
+            break
+        if command_key == "PUBLISH":
+            topic = input("Topic = ")
+            msg = input("Msg = ")
+            client.publish(topic, msg, 0)
 
     client.disconnect()
