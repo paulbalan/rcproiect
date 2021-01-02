@@ -163,6 +163,10 @@ class ClientMQTT:
                     if package_type == 13:
                         print("Ping response get!")
 
+                    # UNSUBACK PACKAGE
+                    if package_type == 11:
+                        print("Unsubcribe sucessful")
+
                 except Exception as e:
                     print("\tException: " + str(e))
                     pass
@@ -225,6 +229,23 @@ class ClientMQTT:
         #         print("\tQos admitted = " + str(return_code))
         #         self.topic_callbacks[topics[index]] = callback
         #         print("Current callbacks: " + str(self.topic_callbacks))
+
+    def unsubscribe(self, topics):
+        builder = UnsubscribeBuilder()
+        builder.buildFixedHeader()
+        builder.buildVariableHeader(self.packedId)
+        builder.buildPayload(topics)
+        unsubscribePackage = builder.getPackage()
+
+        print("Trying to unsubscribe to ", topics)
+
+        #trimiterea pachetului de unsubscribe
+        self.transmitter.sendPackage(unsubscribePackage)
+
+        for topic in topics:
+            del self.topic_callbacks[topic]
+        print(self.topic_callbacks)
+
 
     def publish(self, topic, message, QoS):
         self.packedId += 1
@@ -300,6 +321,11 @@ if __name__ == "__main__":
     time.sleep(4)
 
     client.publish("/register", "Hello, my name is " + username, 0)
+
+    client.unsubscribe(["/register", "/client1/cpu"])
+
+    client.publish("/client1/cpu", "Hello, my name is " + username, 0)
+
 
     time.sleep(30)
     client.disconnect()
