@@ -21,6 +21,7 @@
   <component name="ChangeListManager">
     <list default="true" id="d2d51805-2009-4eb0-8f59-1193e6096e09" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mqtt_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/mqtt_client.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,7 +40,8 @@
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../CeNaiba" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RunManager">
     <configuration name="mqtt_lib" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
@@ -116,5 +118,9 @@
       <screen x="0" y="0" width="1536" height="824" />
     </state>
     <state width="1515" height="230" key="GridCell.Tab.0.right/0.0.1536.824@0.0.1536.824" timestamp="1605734530043" />
+    <state x="2197" y="57" key="SettingsEditor" timestamp="1609610281207">
+      <screen x="1920" y="0" width="1536" height="824" />
+    </state>
+    <state x="2197" y="57" key="SettingsEditor/0.0.1280.680/1920.0.1536.824@1920.0.1536.824" timestamp="1609610281207" />
   </component>
 </project>

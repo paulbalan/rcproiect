@@ -165,7 +165,21 @@ class ClientMQTT:
 
                     # UNSUBACK PACKAGE
                     if package_type == 11:
-                        print("Unsubcribe sucessful")
+                        packet_id = package_recv.getVariableHeader().getField("packet_id")
+                        # check if packet_id exists in unconfirmed
+                        if packet_id in self.unconfirmed.keys():
+                            topics = []
+
+                            for index in range(0, int(len(self.unconfirmed.get(packet_id).getPayload().getAllFields()) / 2)):
+                                topics.append(self.unconfirmed.get(packet_id).getPayload().getField("topic_content_" + str(index)))
+
+                            print("\nUnsubcribe sucessful to ", topics)
+
+                            for topic in topics:
+                                del self.topic_callbacks[topic]
+
+                        self.unconfirmed.pop(packet_id, None)
+
 
                 except Exception as e:
                     print("\tException: " + str(e))
@@ -231,6 +245,7 @@ class ClientMQTT:
         #         print("Current callbacks: " + str(self.topic_callbacks))
 
     def unsubscribe(self, topics):
+        self.packedId += 1
         builder = UnsubscribeBuilder()
         builder.buildFixedHeader()
         builder.buildVariableHeader(self.packedId)
@@ -239,12 +254,10 @@ class ClientMQTT:
 
         print("Trying to unsubscribe to ", topics)
 
+        self.unconfirmed.update({self.packedId: unsubscribePackage})
+
         #trimiterea pachetului de unsubscribe
         self.transmitter.sendPackage(unsubscribePackage)
-
-        for topic in topics:
-            del self.topic_callbacks[topic]
-        print(self.topic_callbacks)
 
 
     def publish(self, topic, message, QoS):
