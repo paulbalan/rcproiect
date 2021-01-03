@@ -55,7 +55,7 @@ class ClientMQTT:
         self.loop_flag = False
         self.keep_alive = 0
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.conn.settimeout(5)
+        self.conn.settimeout(1)
         self.transmitter = SenderReceiver(self.conn)
 
         self.packedId = 0
@@ -67,6 +67,7 @@ class ClientMQTT:
 
         self.clientId = result_str
 
+        # all callbacks are with the following arguments: topic, message
         self.topic_callbacks = {}
         # used only for subscribe
         self.unconfirmed_subscribe = {}
@@ -85,10 +86,13 @@ class ClientMQTT:
 
     def keep_alive_clock(self):
         while self.keep_alive_flag is True:
-            time.sleep(self.keep_alive / 2)
+            wait_time = self.keep_alive / 2
+            while wait_time > 0 and self.keep_alive_flag is True:
+                time.sleep(1)
+                wait_time -= 1
 
             if self.keep_alive_flag is True:
-                print("Ping sent!")
+                # print("Ping sent!")
                 # send ping
                 builder = PingreqBuilder()
                 builder.reset()
@@ -117,7 +121,7 @@ class ClientMQTT:
                             print("Conected successfully!")
                             # set keep alive thread
                             if self.keep_alive != 0:
-                                self.conn.settimeout(self.keep_alive)
+                                # self.conn.settimeout(self.keep_alive)
                                 self.keep_alive_flag = True
                                 self.ping_thread.start()
 
@@ -129,7 +133,27 @@ class ClientMQTT:
                         # get the topic and run callback
                         topic = package_recv.getVariableHeader().getField("topic_name")
                         if topic in self.topic_callbacks.keys():
-                            threading.Thread(target=self.topic_callbacks[topic], args=[package_recv]).start()
+                            threading.Thread(target=self.topic_callbacks[topic],
+                                             args=[package_recv.getVariableHeader().getField("topic_name"),
+                                                   package_recv.getPayload().getField("application_message")]).start()
+
+                        # if the qos >= 1, send prompt packages
+
+                    # PUBACK PACKAGE
+                    if package_type == 4:
+                        print("Received PUBACK")
+
+                    # PUBACK PUBREC
+                    if package_type == 5:
+                        print("Received PUBREC")
+
+                    # PUBACK PUBREL
+                    if package_type == 6:
+                        print("Received PUBREL")
+
+                    # PUBACK PUBCOMP
+                    if package_type == 7:
+                        print("Received PUBCOMP")
 
                     # SUBACK PACKAGE
                     if package_type == 9:
@@ -159,10 +183,6 @@ class ClientMQTT:
                             # I treated the package, now there is no need for it so i can delete it
                             self.unconfirmed_subscribe.pop(packet_id, None)
 
-                    # PINGRESP PACKAGE
-                    if package_type == 13:
-                        print("Ping response get!")
-
                     # UNSUBACK PACKAGE
                     if package_type == 11:
                         packet_id = package_recv.getVariableHeader().getField("packet_id")
@@ -170,8 +190,10 @@ class ClientMQTT:
                         if packet_id in self.unconfirmed.keys():
                             topics = []
 
-                            for index in range(0, int(len(self.unconfirmed.get(packet_id).getPayload().getAllFields()) / 2)):
-                                topics.append(self.unconfirmed.get(packet_id).getPayload().getField("topic_content_" + str(index)))
+                            for index in range(0, int(
+                                    len(self.unconfirmed.get(packet_id).getPayload().getAllFields()) / 2)):
+                                topics.append(self.unconfirmed.get(packet_id).getPayload().getField(
+                                    "topic_content_" + str(index)))
 
                             print("\nUnsubcribe sucessful to ", topics)
 
@@ -180,10 +202,16 @@ class ClientMQTT:
 
                         self.unconfirmed.pop(packet_id, None)
 
+                    # PINGRESP PACKAGE
+                    if package_type == 13:
+                        # print("Ping response get!")
+                        pass
 
-                except Exception as e:
-                    print("\tException: " + str(e))
-                    pass
+                except Exception as ex:
+                    if "An established connection was aborted by the software in your host machine" in str(ex):
+                        exit(-1)
+                    if "timed out" not in str(ex):
+                        print("\tException: " + str(ex))
 
     def connect(self, flags, keep_alive, username='', password='', willTopic='', willMessage=''):
 
@@ -191,18 +219,18 @@ class ClientMQTT:
         builder = ConnectBuilder()
         builder.buildFixedHeader()
         builder.buildVariableHeader(flags, keep_alive)
-        builder.buildPayload(self.clientId, username=username, password=password, willMessage=willMessage,
+        # a problem occurs with the will message, the first 2 chars are not considered so, i just patch it
+        builder.buildPayload(self.clientId, username=username, password=password, willMessage="  " + willMessage,
                              willTopic=willTopic)
         connectPackage = builder.getPackage()
 
         print("Connecting as " + username + " ...")
+        # print(str(connectPackage))
+        # displayControlPackageBinary(self.transmitter.encoder.encode(connectPackage))
         self.keep_alive = keep_alive
 
         # send a connect package
         self.transmitter.sendPackage(connectPackage)
-
-        # receive connack
-        # connackPackage = self.transmitter.receivePackage()
 
     # callback must have a parameter for the packet received!
     def subscribe(self, topics, QoS, callback):
@@ -227,23 +255,6 @@ class ClientMQTT:
         # trimiterea pachetului de subscribe
         self.transmitter.sendPackage(subscribePackage)
 
-        # astept raspuns de subscribe
-        # subackPackage = self.transmitter.receivePackage()
-
-        # if subackPackage.getVariableHeader().getField("packet_id") != self.packedId:
-        #     print("Id Packets for suback does not match!")
-        #
-        # for index in range(0, len(topics)):
-        #     return_code = subackPackage.getPayload().getField("return_code_" + str(index))
-        #     print("Trying to subscribe to " + topics[index] + "...")
-        #     if return_code == 0x80:
-        #         print("\tResult = FAILURE")
-        #     else:
-        #         print("\tResult = SUCCESS")
-        #         print("\tQos admitted = " + str(return_code))
-        #         self.topic_callbacks[topics[index]] = callback
-        #         print("Current callbacks: " + str(self.topic_callbacks))
-
     def unsubscribe(self, topics):
         self.packedId += 1
         builder = UnsubscribeBuilder()
@@ -256,9 +267,8 @@ class ClientMQTT:
 
         self.unconfirmed.update({self.packedId: unsubscribePackage})
 
-        #trimiterea pachetului de unsubscribe
+        # trimiterea pachetului de unsubscribe
         self.transmitter.sendPackage(unsubscribePackage)
-
 
     def publish(self, topic, message, QoS):
         self.packedId += 1
@@ -272,17 +282,6 @@ class ClientMQTT:
 
         publishPackage = builder.getPackage()
         self.transmitter.sendPackage(publishPackage)
-
-        # if QoS != 0:
-        #     # astept sa primesc confirmare
-        #     while True:
-        #         try:
-        #             pubAck = self.transmitter.receivePackage()
-        #             if pubAck.getType() in [4, 5]:
-        #                 print("Message( " + message + " ) was susscessfully sent to \"" + topic + "\"!")
-        #             break
-        #         except:
-        #             pass
 
     def disconnect(self):
         # create disconnect
@@ -305,16 +304,17 @@ class ClientMQTT:
         print("Client disconnected!")
 
 
-def people_entered(publish_package):
-    message = publish_package.getPayload().getField("application_message")
-    print("Posted on /register:")
-    print("\t" + message)
+def people_entered(topic_name, publish_message):
+    print("Posted on " + topic_name + ":")
+    print("\t" + publish_message)
 
 
-def publish_get(publish_package):
-    topic_name = publish_package.getVariableHeader().getField("topic_name")
-    message = publish_package.getPayload().getField("application_message")
-    print("(Received)" + topic_name + ": " + message)
+def publish_get(topic_name, publish_message):
+    print("(Received)" + topic_name + ": " + publish_message)
+
+
+def custom_publish_get(topic_name, publish_message):
+    print("[" + topic_name + "]: \"" + publish_message + "\"")
 
 
 if __name__ == "__main__":
@@ -326,19 +326,49 @@ if __name__ == "__main__":
     username = input("Username = ")
 
     client = ClientMQTT(address)
-    client.connect(flags="10000000", keep_alive=10, username=username, willTopic="/register",
-                   willMessage="Disconnected " + username)
-    client.subscribe(["/register"], [2], people_entered)
-    client.subscribe(["/client1/cpu", "/client1/ram"], [2, 2], publish_get)
+    client.connect(flags="10000100", keep_alive=10, username=username, willTopic="/register",
+                   willMessage=username + "was disconnected ...")
 
-    time.sleep(4)
+    # client.subscribe(["/register"], [2], people_entered)
+    # client.subscribe(["/client1/cpu", "/client1/ram"], [2, 2], publish_get)
+    #
+    # time.sleep(4)
+    #
+    # client.publish("/register", "Hello, my name is " + username, 0)
+    #
+    # client.unsubscribe(["/register", "/client1/cpu"])
+    #
+    # client.publish("/client1/cpu", "Hello, my name is " + username, 0)
 
-    client.publish("/register", "Hello, my name is " + username, 0)
+    while True:
+        try:
+            command = input("$: ")
+            if command == "subscribe":
+                nr_topics = input("\t$nr of topics: ")
+                topics = []
+                qos = []
+                for i in range(int(nr_topics)):
+                    topics.append(input("\t$topic: "))
+                    qos.append(int(input("\t$qos: ")))
+                client.subscribe(topics, qos, custom_publish_get)
+            if command == "unsubscribe":
+                nr_topics = input("\t$nr of topics: ")
+                topics = []
+                for i in range(int(nr_topics)):
+                    topics.append(input("\t$topic: "))
+                client.unsubscribe(topics)
 
-    client.unsubscribe(["/register", "/client1/cpu"])
+            if command == "publish":
+                topic = input("\t$topic: ")
+                qos = int(input("\t$qos: "))
+                message = input("\t$message: ")
+                client.publish(topic, message, qos)
 
-    client.publish("/client1/cpu", "Hello, my name is " + username, 0)
+            if command == "topics":
+                print("Topics: " + str(client.topic_callbacks.keys()))
 
-
-    time.sleep(30)
-    client.disconnect()
+            if command == "disconnect":
+                client.disconnect()
+                break
+        except Exception as e:
+            print(e)

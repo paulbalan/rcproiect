@@ -447,6 +447,8 @@ class ConnectBuilder(IPackageBuilder):
         # username(0) | password(1) | will retain(2) | will Qos(3 - 4) | will flag(5) | cleanSesion(6) | reserved(7)
         self.variableHeader.setField("connect_flags", int(connectFlags, 2), 1)
 
+        # ############### A SE ADAUGA TREABA CA DACA WILL FLAG = 0, QOS SE FACE 0 ############
+
         # keep alive
         self.variableHeader.setField("keep_alive", keepAlive, 2)
 
@@ -989,6 +991,11 @@ class PublishBuilder(IPackageBuilder):
         else:
             # type = 0011
             self.fixedHeader.setType(3)
+
+            # special case
+            if QoS == 0:
+                DUP = 0
+
             # flags = 0000 (reserved)
             flagValue = int('{0:01b}'.format(DUP) + '{0:02b}'.format(QoS) + '{0:01b}'.format(RETAIN), 2)
             self.fixedHeader.setFlags(flagValue)

@@ -6,7 +6,7 @@ from package_encoder import *
 if __name__ == "__main__":
     builder = PublishBuilder()
     builder.reset()
-    builder.buildFixedHeader(DUP=1, QoS=3, RETAIN=0)
+    builder.buildFixedHeader(DUP=1, QoS=2, RETAIN=0)
     builder.buildVariableHeader(topic="/boss", packetId=50245)
     builder.buildPayload("salut")
 
