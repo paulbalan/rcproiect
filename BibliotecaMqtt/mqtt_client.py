@@ -325,9 +325,10 @@ if __name__ == "__main__":
     address = (ip, port)
 
     username = input("Username = ")
+	password = input("Password = ")
 
     client = ClientMQTT(address)
-    client.connect(flags="10000100", keep_alive=10, username=username, willTopic="/register",
+    client.connect(flags="11000100", keep_alive=10, username=username, password=password, willTopic="/register",
                    willMessage=username + "was disconnected ...")
 
     # client.subscribe(["/register"], [2], people_entered)
