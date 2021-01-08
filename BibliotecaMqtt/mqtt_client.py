@@ -320,6 +320,7 @@ def custom_publish_get(topic_name, publish_message):
 if __name__ == "__main__":
     # configure the adress of the broker
     ip = socket.gethostbyname(socket.gethostname())
+
     port = 1883
     address = (ip, port)
 
