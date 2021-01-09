@@ -171,7 +171,7 @@ class PubcompBuilder(IPackageBuilder):
                 raise Exception("Flags do not match with builder specific flag types!")
             self.fixedHeader = fixedHeader
         else:
-            # type = 1100
+            # type = 0111
             self.fixedHeader.setType(7)
             # flags = 0000 (reserved)
             self.fixedHeader.setFlags(0)
@@ -598,7 +598,7 @@ class PubrecBuilder(PubackBuilder):
                 raise Exception("RemLength do not match with builder remLength!")
             self.fixedHeader = fixedHeader
         else:
-            # type = 0005
+            # type = 0101
             self.fixedHeader.setType(5)
             # flags = 0000 (reserved)
             self.fixedHeader.setFlags(0)
@@ -913,16 +913,16 @@ class PubrelBuilder(IPackageBuilder):
 
     def buildFixedHeader(self, fixedHeader=None):
         if fixedHeader is not None:
-            if fixedHeader.getType() != 5:
+            if fixedHeader.getType() != 6:
                 raise Exception("Type does not match with builder type!")
-            if fixedHeader.getFlags() != 0:
+            if fixedHeader.getFlags() != 2:
                 raise Exception("Flags do not match with builder specific flag types!")
             self.fixedHeader = fixedHeader
         else:
-            # type = 0001
-            self.fixedHeader.setType(5)
-            # flags = 0000 (reserved)
-            self.fixedHeader.setFlags(0)
+            # type = 0110
+            self.fixedHeader.setType(6)
+            # flags = 0010 (reserved)
+            self.fixedHeader.setFlags(2)
             # reset remaining length
             self.fixedHeader.setRemainingLength(2)
 
@@ -1014,8 +1014,8 @@ class PublishBuilder(IPackageBuilder):
         self.variableHeader.addFieldName("topic_name")
 
         # if Qos > 0 atunci i se ataseaza si un packet_identifier
-        flags = bin(self.fixedHeader.getFlags()).format('04b')[2:]
-        if flags[1:3] != '00':
+        Qos = (self.fixedHeader.getFlags() & 6) >> 1
+        if Qos != 0:
             self.variableHeader.addFieldName("packet_id")
             self.variableHeader.setField("packet_id", packetId, 2)
 

@@ -13,12 +13,15 @@ class SenderReceiver:
         self.encoder = GenericPackageEncoder()
         self.decoder = GenericPackageDecoder()
         self.conn = conn
+        self.lock = threading.RLock()
         pass
 
     def sendPackage(self, package):
         # encode package to binary and send to conenction
         text = self.encoder.encode(package)
+        self.lock.acquire()
         sent_bytes = self.conn.send(str_to_binary(text))
+        self.lock.release()
         return sent_bytes
 
     def receivePackage(self) -> IControlPackage:
@@ -73,6 +76,8 @@ class ClientMQTT:
         self.unconfirmed_subscribe = {}
         # used for other kind of packages
         self.unconfirmed = {}
+        # used for storing the topics for each publish with qos = 2
+        self.stored_topics = {}
 
         print("Client trying to get the Broker socket ...")
         self.conn.connect(addr)
@@ -102,6 +107,53 @@ class ClientMQTT:
                 ping = builder.getPackage()
                 self.transmitter.sendPackage(ping)
 
+    # this method is used for qos purpose
+    # it gets a packet_id, and checks every some seconds the
+    # unconfirmed dictionary
+    # if after the timeout, packet_id key still exists, resend the package
+    def resend_on_timeout(self, unconfirmed_package):
+        packet_id = unconfirmed_package.getVariableHeader().getField("packet_id")
+        packet_type = unconfirmed_package.getType()
+
+        # in case of publish, we change the package: dup = 1
+        if packet_type == 3:
+            current_flags = unconfirmed_package.getFixedHeader().getFlags()
+            unconfirmed_package.getFixedHeader().setFlags(current_flags | 8)
+
+        # set the timeout
+        done_flag = False
+        timeout = 3
+        step = 0.5
+
+        while done_flag is False:
+            index = timeout
+            exist_flag = True
+
+            while index > 0:
+                time.sleep(step)
+
+                # check if package is not in unconfirmed
+                if packet_id not in self.unconfirmed.keys():
+                    exist_flag = False
+                    break
+                else:
+                    # packed_id exists, but has another type
+                    existing_packet_type = self.unconfirmed[packet_id].getType()
+
+                    if packet_type != existing_packet_type:
+                        # special for qos2
+                        exist_flag = False
+
+                index -= step
+
+            # check the exist_flag
+            if exist_flag is True:
+                # we need to resend the package
+                print("Due to timeout, resend: " + str(unconfirmed_package.getType()) + " package type")
+                self.transmitter.sendPackage(unconfirmed_package)
+            else:
+                done_flag = True
+
     def receive_constantly(self):
         while self.loop_flag is True:
             if self.loop_flag is True:
@@ -130,30 +182,150 @@ class ClientMQTT:
 
                     # PUBLISH PACKAGE
                     if package_type == 3:
-                        # get the topic and run callback
-                        topic = package_recv.getVariableHeader().getField("topic_name")
-                        if topic in self.topic_callbacks.keys():
-                            threading.Thread(target=self.topic_callbacks[topic],
-                                             args=[package_recv.getVariableHeader().getField("topic_name"),
-                                                   package_recv.getPayload().getField("application_message")]).start()
 
-                        # if the qos >= 1, send prompt packages
+                        # get the topic and run callback
+                        packet_topic = package_recv.getVariableHeader().getField("topic_name")
+                        packet_message = package_recv.getPayload().getField("application_message")
+                        packet_qos = ((package_recv.getFixedHeader().getFlags() & 6) >> 1)
+
+                        # get the packet id
+                        # if qos == 0, it has no packet_id
+                        packet_id = package_recv.getVariableHeader().getField('packet_id')
+                        packet_id_string = str(packet_id)
+
+                        packet_DUP = ((package_recv.getFixedHeader().getFlags() & 8) > 0)
+                        print("Received Publish[" + packet_id_string + "](DUP=" + str(
+                            packet_DUP) + ", QoS=" + str(packet_qos) + "):   [" + packet_topic + "]: \""
+                              + packet_message + "\"")
+
+                        if packet_topic in self.topic_callbacks.keys():
+                            # get required information
+                            callback, broker_qos = self.topic_callbacks[packet_topic]
+
+                            # depending on the qos, manage the feedback
+                            if packet_qos == 0:
+                                # send nothing back, just call the function to handle publish
+                                # start the thread
+                                threading.Thread(target=callback,
+                                                 args=[package_recv.getVariableHeader().getField("topic_name"),
+                                                       package_recv.getPayload().getField(
+                                                           "application_message")]).start()
+
+                            if packet_qos == 1:
+                                # send puback to broker
+                                puback_builder = PubackBuilder()
+                                puback_builder.reset()
+                                puback_builder.buildFixedHeader()
+                                puback_builder.buildVariableHeader(packet_id)
+                                puback_builder.buildPayload()
+
+                                pubackPackage = puback_builder.getPackage()
+                                self.transmitter.sendPackage(pubackPackage)
+
+                                # start the thread
+                                threading.Thread(target=callback,
+                                                 args=[package_recv.getVariableHeader().getField("topic_name"),
+                                                       package_recv.getPayload().getField(
+                                                           "application_message")]).start()
+
+                            if packet_qos == 2:
+                                # extract DUP from package
+                                # send Pubrec package and wait for Pubrel sequance
+                                pubrec_builder = PubrecBuilder()
+                                pubrec_builder.reset()
+                                pubrec_builder.buildFixedHeader()
+                                pubrec_builder.buildVariableHeader(packet_id)
+                                pubrec_builder.buildPayload()
+
+                                pubrecPackage = pubrec_builder.getPackage()
+
+                                # put the package into the unconfirmed
+                                self.unconfirmed[packet_id] = pubrecPackage
+                                # save the topic to stored_topics
+                                self.stored_topics[packet_id] = (packet_topic, packet_message)
+
+                                # start the receving thread
+                                threading.Thread(target=self.resend_on_timeout, args=[pubrecPackage]).start()
+
+                                self.transmitter.sendPackage(pubrecPackage)
 
                     # PUBACK PACKAGE
                     if package_type == 4:
-                        print("Received PUBACK")
+                        packet_id = package_recv.getVariableHeader().getField('packet_id')
+                        print("Received PUBACK[" + str(packet_id) + "]")
 
-                    # PUBACK PUBREC
+                        if packet_id in self.unconfirmed.keys():
+                            # daca este un publish in lista
+                            if self.unconfirmed[packet_id].getType() == 3:
+                                # stergem din lista, in acest moment s a terminat operatia de publish
+                                self.unconfirmed.pop(packet_id, None)
+
+                    # PUBREC PACKAGE
                     if package_type == 5:
-                        print("Received PUBREC")
+                        packet_id = package_recv.getVariableHeader().getField('packet_id')
+                        print("Received PUBREC[" + str(packet_id) + "]")
 
-                    # PUBACK PUBREL
+                        if packet_id in self.unconfirmed.keys():
+                            # daca este un publish
+                            if self.unconfirmed[packet_id].getType() == 3:
+                                # stergem din lista si trimitem un pubrel
+                                self.unconfirmed.pop(packet_id, None)
+
+                                pubrel_builder = PubrelBuilder()
+                                pubrel_builder.buildFixedHeader()
+                                pubrel_builder.buildVariableHeader(packet_id)
+                                pubrel_builder.buildPayload()
+                                pubrel_package = pubrel_builder.getPackage()
+
+                                # adaugam noul pachet in unconfirmed
+                                self.unconfirmed[packet_id] = pubrel_package
+
+                                # activez threadul de timeout care retrimite pubrel daca exista in lista
+                                threading.Thread(target=self.resend_on_timeout, args=[pubrel_package]).start()
+                                # trimit pubrel
+                                self.transmitter.sendPackage(pubrel_package)
+
+                    # PUBREL
                     if package_type == 6:
-                        print("Received PUBREL")
+                        packet_id = package_recv.getVariableHeader().getField('packet_id')
+                        print("Received PUBREL[" + str(packet_id) + "]")
 
-                    # PUBACK PUBCOMP
+                        if packet_id in self.unconfirmed.keys():
+                            # daca este un pubrel
+                            if self.unconfirmed[packet_id].getType() == 5:
+                                # stergem din lista si trimitem un pubcomp
+                                self.unconfirmed.pop(packet_id, None)
+
+                                pubcomp_builder = PubcompBuilder()
+                                pubcomp_builder.buildFixedHeader()
+                                pubcomp_builder.buildVariableHeader(packet_id)
+                                pubcomp_builder.buildPayload()
+                                pubcomp_package = pubcomp_builder.getPackage()
+
+                                self.transmitter.sendPackage(pubcomp_package)
+
+                                # i take the topic assigned to packet_id
+                                packet_topic, packet_message = self.stored_topics[packet_id]
+                                # delete topic from stored_topics_list
+                                self.stored_topics.pop(packet_id, None)
+
+                                # get required information
+                                callback, broker_qos = self.topic_callbacks[packet_topic]
+
+                                # start the thread
+                                threading.Thread(target=callback,
+                                                 args=[packet_topic, packet_message]).start()
+
+                    # PUBCOMP
                     if package_type == 7:
-                        print("Received PUBCOMP")
+                        packet_id = package_recv.getVariableHeader().getField('packet_id')
+                        print("Received PUBCOMP[" + str(packet_id) + "]")
+
+                        if packet_id in self.unconfirmed.keys():
+                            # daca este un pubrel
+                            if self.unconfirmed[packet_id].getType() == 6:
+                                # stergem din lista
+                                self.unconfirmed.pop(packet_id, None)
 
                     # SUBACK PACKAGE
                     if package_type == 9:
@@ -168,7 +340,7 @@ class ClientMQTT:
                             topics = []
                             for index in range(0, int(len(subscribe.getPayload().getAllFields()) / 3)):
                                 topics.append(subscribe.getPayload().getField("topic_content_" + str(index)))
-                            print("\t\tTopics = " + str(topics))
+                            # print("\t\tTopics = " + str(topics))
 
                             for index in range(0, len(topics)):
                                 return_code = package_recv.getPayload().getField("return_code_" + str(index))
@@ -178,7 +350,7 @@ class ClientMQTT:
                                 else:
                                     print("\tResult = SUCCESS")
                                     print("\tQos admitted = " + str(return_code))
-                                    self.topic_callbacks[topics[index]] = callback
+                                    self.topic_callbacks[topics[index]] = (callback, return_code)
                                     # print("Current callbacks: " + str(self.topic_callbacks))
                             # I treated the package, now there is no need for it so i can delete it
                             self.unconfirmed_subscribe.pop(packet_id, None)
@@ -209,6 +381,10 @@ class ClientMQTT:
 
                 except Exception as ex:
                     if "An established connection was aborted by the software in your host machine" in str(ex):
+                        print("\tException: " + str(ex))
+                        exit(-1)
+                    if "string index out of range" in str(ex):
+                        print("\tException: " + str(ex))
                         exit(-1)
                     if "timed out" not in str(ex):
                         print("\tException: " + str(ex))
@@ -220,7 +396,7 @@ class ClientMQTT:
         builder.buildFixedHeader()
         builder.buildVariableHeader(flags, keep_alive)
         # a problem occurs with the will message, the first 2 chars are not considered so, i just patch it
-        builder.buildPayload(self.clientId, username=username, password=password, willMessage="  " + willMessage,
+        builder.buildPayload(self.clientId, username=username, password=password, willMessage=willMessage,
                              willTopic=willTopic)
         connectPackage = builder.getPackage()
 
@@ -281,7 +457,14 @@ class ClientMQTT:
         builder.buildPayload(message)
 
         publishPackage = builder.getPackage()
+        print("Publish[" + str(self.packedId) + "] sent:")
+        print("\t[" + topic + "]: \"" + message + "\"")
         self.transmitter.sendPackage(publishPackage)
+
+        # prepearing the thread that assures the resending of the message if there was a problem
+        if QoS > 0:
+            self.unconfirmed[self.packedId] = publishPackage
+            threading.Thread(target=self.resend_on_timeout, args=[publishPackage]).start()
 
     def disconnect(self):
         # create disconnect
@@ -320,32 +503,19 @@ def custom_publish_get(topic_name, publish_message):
 if __name__ == "__main__":
     # configure the adress of the broker
     ip = socket.gethostbyname(socket.gethostname())
-
     port = 1883
     address = (ip, port)
 
     username = input("Username = ")
-	password = input("Password = ")
 
     client = ClientMQTT(address)
-    client.connect(flags="11000100", keep_alive=10, username=username, password=password, willTopic="/register",
-                   willMessage=username + "was disconnected ...")
-
-    # client.subscribe(["/register"], [2], people_entered)
-    # client.subscribe(["/client1/cpu", "/client1/ram"], [2, 2], publish_get)
-    #
-    # time.sleep(4)
-    #
-    # client.publish("/register", "Hello, my name is " + username, 0)
-    #
-    # client.unsubscribe(["/register", "/client1/cpu"])
-    #
-    # client.publish("/client1/cpu", "Hello, my name is " + username, 0)
+    client.connect(flags="10000100", keep_alive=90, username=username, willTopic="/register",
+                   willMessage="[" + username + "]:disconnected")
 
     while True:
         try:
             command = input("$: ")
-            if command == "subscribe":
+            if command == "subscribe" or command == "s":
                 nr_topics = input("\t$nr of topics: ")
                 topics = []
                 qos = []
@@ -353,23 +523,23 @@ if __name__ == "__main__":
                     topics.append(input("\t$topic: "))
                     qos.append(int(input("\t$qos: ")))
                 client.subscribe(topics, qos, custom_publish_get)
-            if command == "unsubscribe":
+            if command == "unsubscribe" or command == "u":
                 nr_topics = input("\t$nr of topics: ")
                 topics = []
                 for i in range(int(nr_topics)):
                     topics.append(input("\t$topic: "))
                 client.unsubscribe(topics)
 
-            if command == "publish":
+            if command == "publish" or command == "p":
                 topic = input("\t$topic: ")
                 qos = int(input("\t$qos: "))
                 message = input("\t$message: ")
                 client.publish(topic, message, qos)
 
-            if command == "topics":
+            if command == "topics" or command == "t":
                 print("Topics: " + str(client.topic_callbacks.keys()))
 
-            if command == "disconnect":
+            if command == "disconnect" or command == "d":
                 client.disconnect()
                 break
         except Exception as e:

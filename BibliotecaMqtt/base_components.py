@@ -129,21 +129,21 @@ class IControlPackage(metaclass=abc.ABCMeta):
 class FixedHeader(IFixedHeader):
     def __init__(self, type=0, flags=0, remLength=0):
         self.setType(type)
-        self.setFlags(flags);
-        self.setRemainingLength(remLength);
+        self.setFlags(flags)
+        self.setRemainingLength(remLength)
 
     def setType(self, type):
         if not type in range(0, 16):
             raise Exception("type must be between 0 and 16")
-        self.type = type;
+        self.type = type
 
     def setFlags(self, flags):
         if not flags in range(0, 16):
             raise Exception("flags must be between 0 and 16")
-        self.flags = flags;
+        self.flags = flags
 
     def setRemainingLength(self, remLength):
-        self.remainingLength = remLength;
+        self.remainingLength = remLength
 
     def getType(self):
         return self.type

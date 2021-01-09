@@ -28,7 +28,7 @@ def displayControlPackageBinary(encodedStr, file=None):
     # encodedStr = str(encodedStr)[2:-1]
 
     for index in range(0, len(encodedStr), 8):
-        chunk = encodedStr[index:index + 8] + "("
+        chunk = str(int(index/8)) + ")\t" +encodedStr[index:index + 8] + "("
         if 32 <= int(encodedStr[index:index + 8], 2) < 128:
             chunk += "'" + chr(int(encodedStr[index:index + 8], 2)) + "', "
         chunk += str(int(encodedStr[index:index + 8], 2)) + ")"
@@ -88,6 +88,7 @@ class GenericPackageEncoder:
                         encodedString += format(ord(char), '08b')
 
         else:"""
+
         for field in payload.getAllFields():
             value = payload.getAllFields()[field]
             # is string -> encode every char
@@ -702,7 +703,7 @@ class PubrelDecoder(IPackageDecoder):
         pass
 
     def getType(self) -> int:
-        return 5
+        return 6
 
     # binaryString is the encoded string of the Variable Header and the Payload
     def decodeVariableComponents(self, binaryString, fixedHeader) -> IControlPackage:
@@ -720,6 +721,7 @@ class PubrelDecoder(IPackageDecoder):
             if binaryString[0:2] == '0b':
                 binaryString = binaryString[2:]
 
+        packetId = int(binaryString, 2)
         packetId = int(binaryString, 2)
 
         # build Variable Header
@@ -757,11 +759,12 @@ class PublishDecoder(IPackageDecoder):
         binaryString, topicName = self.decodeField(binaryString)
 
         # get the Qos field of the fixed header
-        flags = bin(fixedHeader.getFlags()).format('04b')[2:]
-        Qos = flags[1:3]
+        flags = fixedHeader.getFlags()
+        Qos = ((flags & 6) >> 1)
         idPackage = 0
 
-        if Qos != '00':
+        # Qos = 0, deci publish nu contine clientId
+        if Qos != 0:
             idPackage = int(binaryString[0:16], 2)
             binaryString = binaryString[16:]
 
