@@ -404,7 +404,8 @@ class ClientMQTT:
                                 print("\nUnsubcribe sucessful to ", topics)
 
                             for topic in topics:
-                                del self.topic_callbacks[topic]
+                                if(topic in self.topic_callbacks.keys()):
+                                    del self.topic_callbacks[topic]
 
                         self.unconfirmed.pop(packet_id, None)
 

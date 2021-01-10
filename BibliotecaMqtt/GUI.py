@@ -2,7 +2,7 @@
 
 import sys
 
-from PyQt5.QtCore import QObject, QSize
+from PyQt5.QtCore import QObject, QSize,Qt
 from PyQt5.QtGui import QFont, QColor, QPixmap
 from PyQt5.QtWidgets import QApplication, QPushButton, QComboBox, QLineEdit, QListWidget, QListWidgetItem, QCheckBox
 from PyQt5.QtWidgets import QLabel
@@ -15,6 +15,9 @@ from SOResources import *
 
 #lista de topicuri pe care o folosim
 OurTopicsAre = ['CPUUsage','CPUFreq','TotalMemory','MemoryUsage','DiskUsage']
+SubText='           This is the Subscribe tab!\nYou can view the other clients in the list on the left.\nIf you click one of them the buttons for Subscribe and Unsubscribe \nwill appear.\nMake sure to check the topics you want to sub before clicking \nSubscribe.'
+PubText='           This is the Publish tab! \nYou can view your data above. It changes periodically!\nYou can also set the way you publish your data. \n Automatic Publish does it for you from time to time.\n Manual Publish shows another button which publishes your data.'
+
 
 #clasa User va fi folosita pentru a stoca niste date si flag-uri
 #utile aferente altor useri
@@ -135,9 +138,18 @@ class UI:
         self.window.move(100, 15)
 
 
-#login widget
+        #login widget
+        self.BGimage = QLabel(parent=self.window)
+
+        self.darkFlag=False
+
+
+
+
+
         self.login = QWidget(parent=self.window)
         self.login.setGeometry(0, 0, 500, 400)
+
         #writable boxes
         self.user = QLineEdit('', parent=self.login)
         self.user.move(20, 200)
@@ -147,6 +159,7 @@ class UI:
         # pass and user labels(efectiv scrie pass si user)
         self.userLabel = QLabel('Username: ', parent=self.login)
         self.userLabel.move(20, 150)
+
         self.userLabel.setFont(QFont('Arial', 20))
 
         self.passLabel = QLabel('Password: ', parent=self.login)
@@ -163,18 +176,23 @@ class UI:
 #sub widget
         self.subscribe = QWidget(parent=self.window)
         self.subscribe.hide()
-        self.subscribe.setGeometry(0, 0, 400, 800)
+
+        self.subscribe.setGeometry(0, 0, 600, 800)
+
         # lista din stanga ( va scrie user-urile altor clienti)
         self.widgetList = QListWidget(parent=self.subscribe)
         self.widgetList.move(10, 150)
         self.widgetList.resize(200, 400)
+        self.widgetList.setGeometry(25,100,200,400)
         self.widgetList.setFont(QFont('Arial', 15))
+
         #legam listClick de click-ul pe lista
         self.widgetList.clicked.connect(lambda: self.listClick())
 
 
         #datele de la pc-ul clientului la care dam Subscribe
         self.datasub = QWidget(parent=self.window)
+        #self.datasub.show()
         self.datasub.hide()
 
 
@@ -190,45 +208,56 @@ class UI:
 
         #placement of these labels
         self.cpuUsageSub.move(50, 100)
-        self.cpuUsageSub.setFont(QFont('Arial', 10))
+        self.cpuUsageSub.setFont(QFont('Arial', 10, QFont.Bold))
         self.cpuUsageSub.resize(300, 15)
 
         self.cpuFreqSub.move(0, 150)
-        self.cpuFreqSub.setFont(QFont('Arial', 10))
+        self.cpuFreqSub.setFont(QFont('Arial', 10, QFont.Bold))
         self.cpuFreqSub.resize(300, 15)
 
         self.totalMemSub.move(50, 200)
-        self.totalMemSub.setFont(QFont('Arial', 10))
+        self.totalMemSub.setFont(QFont('Arial', 10, QFont.Bold))
         self.totalMemSub.resize(300, 15)
 
         self.memUsageSub.move(0, 250)
-        self.memUsageSub.setFont(QFont('Arial', 10))
+        self.memUsageSub.setFont(QFont('Arial', 10, QFont.Bold))
         self.memUsageSub.resize(300, 15)
 
         self.diskUsageSub.move(50, 300)
-        self.diskUsageSub.setFont(QFont('Arial', 10))
+        self.diskUsageSub.setFont(QFont('Arial', 10, QFont.Bold))
         self.diskUsageSub.resize(300, 15)
 
         #lista de checkbox-uri folosita in subscribe
         self.checkCpuUsage = QCheckBox('CPU Usage', parent=self.subscribe)
         self.checkCpuUsage.setStyleSheet("QCheckBox::indicator { width: 25px; height: 25px;}")
-        self.checkCpuUsage.move(250, 200)
+
+        self.checkCpuUsage.setFont(QFont('Arial', 13))
+        self.checkCpuUsage.setGeometry(250,200,400,25)
+
 
         self.checkCpuFreq = QCheckBox('CPU Frequence', parent=self.subscribe)
         self.checkCpuFreq.setStyleSheet("QCheckBox::indicator { width: 25px; height: 25px;}")
-        self.checkCpuFreq.move(250, 250)
+        self.checkCpuFreq.setFont(QFont('Arial', 13))
+        self.checkCpuFreq.setGeometry(250, 250, 400, 25)
+
 
         self.checktotalmem = QCheckBox('Total Memory', parent=self.subscribe)
         self.checktotalmem.setStyleSheet("QCheckBox::indicator { width: 25px; height: 25px;}")
-        self.checktotalmem.move(250, 300)
+        self.checktotalmem.setFont(QFont('Arial', 13))
+        self.checktotalmem.setGeometry(250, 300, 400, 25)
+
 
         self.checkmemUsage = QCheckBox('Memory Usage', parent=self.subscribe)
         self.checkmemUsage.setStyleSheet("QCheckBox::indicator { width: 25px; height: 25px;}")
-        self.checkmemUsage.move(250, 350)
+        self.checkmemUsage.setFont(QFont('Arial', 13))
+        self.checkmemUsage.setGeometry(250, 350, 400, 25)
+
 
         self.checkdiskUsage = QCheckBox('Disk Usage', parent=self.subscribe)
         self.checkdiskUsage.setStyleSheet("QCheckBox::indicator { width: 25px; height: 25px;}")
-        self.checkdiskUsage.move(250, 400)
+        self.checkdiskUsage.setFont(QFont('Arial', 13))
+        self.checkdiskUsage.setGeometry(250, 400, 400, 25)
+
 
         #butoane pentru subscribe si unsubscribe
         self.subPcButton = QPushButton('Subscribe', parent=self.subscribe)
@@ -251,6 +280,8 @@ class UI:
         self.publish = QWidget(parent=self.window)
         self.publish.hide()
         self.publish.setGeometry(0, 0, 400, 800)
+
+
 
         # datele de la pc-ul clientului
         self.data = QWidget(parent=self.window)
@@ -307,7 +338,7 @@ class UI:
         self.errorMsg.hide()
         self.errorMsg.setStyleSheet('color: red')
         self.errorMsg.setGeometry(15, 50, 400, 50)
-        self.errorMsg.setFont(QFont('Arial', 10))
+        self.errorMsg.setFont(QFont('Arial', 10, QFont.Bold))
 
         # common ui elements (folosim label-ul asta pentru a scrie 'Hello *username*'
         self.helloMsg = QLabel('<h1>MQTT Client</h1>', parent=self.window)
@@ -317,8 +348,8 @@ class UI:
         # tips (vom scrie tips in acest label)
         self.tips = QLabel('', parent=self.common)
         self.tips.setFont(QFont('Arial', 10))
-        self.tips.setGeometry(0, 0, 300, 300)
-        self.tips.move(100, 500)
+        self.tips.setGeometry(0, 0, 500, 500)
+        self.tips.move(100, 400)
 
         # dc button (disconnects the user)
         self.disconnectButton = QPushButton('Disconnect', parent=self.common)
@@ -340,9 +371,11 @@ class UI:
 
         # misc
         self.PCimage = QLabel(parent=self.common)
-        self.PCimage.setPixmap(QPixmap(""))
         self.PCimage.setPixmap(QPixmap("PC.png"))
-        self.PCimage.setGeometry(175, 125, 400, 400)
+        self.PCimage.setGeometry(155, 125, 400, 400)
+
+
+
 
         #flags
         self.autoFlag=False
@@ -360,17 +393,20 @@ class UI:
         self.delButton.clicked.connect(lambda: self.delPc(self.string.text()))
         self.addButton.clicked.connect(lambda: self.addPc(self.string.text()))
 
+        self.addButton.hide()
+        self.delButton.hide()
+        self.string.hide()
 
 
 
+        self.modeButton = QPushButton('Swap Mode',parent=self.login)
+        self.modeButton.move(250,30)
+        self.modeButton.clicked.connect(lambda: self.swapModes())
+
+        self.LightMode()
         self.login.show()
 
         self.window.show()
-
-
-
-
-
 
     #check if a user is subscribed
     def Subbed(self):
@@ -395,11 +431,6 @@ class UI:
                     self.PCimage.show()
                     self.datasub.hide()
                     # stop thread here?
-
-
-
-
-
 
     #sets the client's labels
     def setLabels(self,params): #params e o lista formata din apeluri de functie ->datele returnate de ele
@@ -429,7 +460,7 @@ class UI:
 
     def subUserLabels(self):
         timer = 5  # timer original 30
-        print(str(self.subworkerFlag))
+
         while self.subworkerFlag:
             index = timer
             while index > 0 and self.subworkerFlag:
@@ -495,21 +526,18 @@ class UI:
 
     def subscribePress(self):
         self.uncheckAll()
-        self.common.show()
-        self.subscribe.show()
         self.login.hide()
         self.publish.hide()
         self.data.hide()
 
+        self.common.show()
+        self.subscribe.show()
+
         self.subPcButton.hide()
         self.unsubPcButton.hide()
 
-
         self.PCimage.show()
-        self.tips.setText('SUBSCRIBE TEXT')
-        # press X does what?
-        # subscribe buttons
-
+        self.tips.setText(SubText)
     def subscribeButtonPress(self):
         # change i to item or sth
         for person in self.Clients:
@@ -597,13 +625,17 @@ class UI:
 
     def publishPress(self):
         self.publish.show()
+
         self.subscribe.hide()
-        self.tips.setText('PUBLISH TEXT')
-        self.uncheckAll()
         self.PCimage.hide()
         self.errorMsg.hide()
+        self.uncheckAll()
+
+        self.tips.setText(PubText)
+
         self.data.show()
         self.datasub.hide()
+
         self.setLabels([ProcessorPercent(), ProcessorFreq(), Memory(), UsedMemory(), DiskUsage()])
 #functie care seteaza tipul de publish pe auto
     def automaticClick(self):
@@ -678,38 +710,62 @@ class UI:
     #login-related
     def loginPress(self, user, password):
 
-        if (user.text() != ''): # and password.text() != ''):
+        if (user.text() != '' and password.text() != ''):
             #makin the address
             ip = socket.gethostbyname(socket.gethostname())
             port = 1883
             address = (ip, port)
             #connect the client
             self.client = ClientMQTT(address)
+            # code=self.client.connect(flags="11110110", keep_alive=90, username=self.user.text(), willTopic="/register",
+            #                     willMessage='[' + self.user.text() + "]:disconnected")
+            code=self.client.connect(flags="11110110", keep_alive=90, username=self.user.text(), password=self.password.text(),
+                           willTopic="/register",
+                           willMessage="[" + self.user.text() + "]:disconnected")
 
-            self.client.connect(flags="10000100", keep_alive=10, username=self.user.text(), willTopic="/register",
-                                willMessage='[' + self.user.text() + "]:disconnected")
-            time.sleep(2)
-            #publish on the main topic
-            self.clientConnected = True
-            self.client.subscribe('/register', 0, self.mainTopicMessage)
-            #starting gathering client's specs
-            self.specFlag = True
-            threading.Thread(target=self.updateSpecs).start()
+            if( code == 0 ):
+                time.sleep(2)
+                #publish on the main topic
+                self.clientConnected = True
+                self.client.subscribe('/register', 0, self.mainTopicMessage)
+                #starting gathering client's specs
+                self.specFlag = True
+                threading.Thread(target=self.updateSpecs).start()
 
-            self.subworkerFlag = True
-            threading.Thread(target=self.subUserLabels).start()
+                self.subworkerFlag = True
+                threading.Thread(target=self.subUserLabels).start()
 
-            #setting some size things and texts up
-            self.tips.setText('SUBSCRIBE')  # tips pt subscribe
-            self.window.resize(QSize(1000, 800))
-            self.helloMsg.setText('Hello ' + self.user.text())
+                #setting some size things and texts up
+                self.tips.setText(SubText)
+                self.window.resize(QSize(1000, 800))
+                self.helloMsg.setText('Hello ' + self.user.text())
 
-            self.login.hide()
+                self.login.hide()
 
-            self.subscribe.show()
-            self.common.show()
+                self.subscribe.show()
+                self.common.show()
+                self.BGimage.resize(2000,800)
 
-            self.errorMsg.hide()
+                self.data.hide()
+                self.PCimage.show()
+
+
+                self.errorMsg.hide()
+            elif code == 4 or code == 5:
+                self.errorMsg.show()
+                self.errorMsg.move(50, 100)
+                self.errorMsg.setText("Wrong username or password")
+            elif code == 3:
+                self.errorMsg.show()
+                self.errorMsg.move(50, 100)
+                self.errorMsg.setText("Server unavailable")
+            else:
+                self.errorMsg.show()
+                self.errorMsg.move(50, 100)
+                self.errorMsg.setText("A problem occured!")
+
+
+
 
 
 
@@ -755,7 +811,7 @@ class UI:
         self.password.clear()
         self.helloMsg.setText('MQTT Client')
 
-
+        self.BGimage.setGeometry(0, 0, 500, 400)
 
         # Misc
 
@@ -791,9 +847,64 @@ class UI:
         if(person!= None):
             self.Clients.remove(person)
 
+    def swapModes(self):
+        self.darkFlag= not self.darkFlag
 
+        if(not self.darkFlag):
+            self.LightMode()
+        else:
+            self.DarkMode()
 
+    def DarkMode(self):
+        self.BGimage.setPixmap(QPixmap("BGDark.png"))
+        self.BGimage.show()
+        self.BGimage.setAlignment(Qt.AlignLeft)
 
+        self.userLabel.setStyleSheet('color: white')
+        self.passLabel.setStyleSheet('color: white')
+        self.tips.setStyleSheet('color: white')
+        self.checkCpuUsage.setStyleSheet('color: white')
+        self.checkdiskUsage.setStyleSheet('color: white')
+        self.checkCpuFreq.setStyleSheet('color: white')
+        self.checktotalmem.setStyleSheet('color: white')
+        self.checkmemUsage.setStyleSheet('color: white')
+        self.helloMsg.setStyleSheet('color: white')
+
+        self.cpuFreq.setStyleSheet('color: white')
+        self.cpuUsage.setStyleSheet('color: white')
+        self.cpuFreqSub.setStyleSheet('color: white')
+        self.cpuUsageSub.setStyleSheet('color: white')
+        self.memUsage.setStyleSheet('color: white')
+        self.memUsageSub.setStyleSheet('color: white')
+        self.totalMem.setStyleSheet('color: white')
+        self.totalMemSub.setStyleSheet('color: white')
+        self.diskUsage.setStyleSheet('color: white')
+        self.diskUsageSub.setStyleSheet('color: white')
+    def LightMode(self):
+        self.BGimage.setPixmap(QPixmap("BG.png"))
+        self.BGimage.show()
+        self.BGimage.setAlignment(Qt.AlignLeft)
+
+        self.userLabel.setStyleSheet('color: black')
+        self.passLabel.setStyleSheet('color: black')
+        self.tips.setStyleSheet('color: black')
+        self.checkCpuUsage.setStyleSheet('color: black')
+        self.checkdiskUsage.setStyleSheet('color: black')
+        self.checkCpuFreq.setStyleSheet('color: black')
+        self.checktotalmem.setStyleSheet('color: black')
+        self.checkmemUsage.setStyleSheet('color: black')
+        self.helloMsg.setStyleSheet('color: black')
+
+        self.cpuFreq.setStyleSheet('color: black')
+        self.cpuUsage.setStyleSheet('color: black')
+        self.cpuFreqSub.setStyleSheet('color: black')
+        self.cpuUsageSub.setStyleSheet('color: black')
+        self.memUsage.setStyleSheet('color: black')
+        self.memUsageSub.setStyleSheet('color: black')
+        self.totalMem.setStyleSheet('color: black')
+        self.totalMemSub.setStyleSheet('color: black')
+        self.diskUsage.setStyleSheet('color: black')
+        self.diskUsageSub.setStyleSheet('color: black')
     def uncheckAll(self):
         self.checkCpuUsage.setChecked(False)
         self.checkCpuFreq.setChecked(False)
