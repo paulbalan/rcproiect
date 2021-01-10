@@ -25,50 +25,58 @@ class SenderReceiver:
         return sent_bytes
 
     def receivePackage(self) -> IControlPackage:
-        # receive Fixed Header and then the variable part
-        # create fixedHeader
-        header_content = ""
+        try:
+            # receive Fixed Header and then the variable part
+            # create fixedHeader
+            header_content = ""
 
-        # read flags
-        flags = self.conn.recv(1)
-        header_content += binary_to_str(flags)
+            # read flags
+            flags = self.conn.recv(1)
+            header_content += binary_to_str(flags)
 
-        # read remaining length
-        remLength = binary_to_str(self.conn.recv(1))
-        header_content += remLength
-        while remLength[0] == '1':
+            # read remaining length
             remLength = binary_to_str(self.conn.recv(1))
             header_content += remLength
+            while remLength == '1':
+                remLength = binary_to_str(self.conn.recv(1))
+                header_content += remLength
 
-        # decode header
-        header_component = self.decoder.decodeFixedHeader(header_content)
+            # decode header
+            header_component = self.decoder.decodeFixedHeader(header_content)
 
-        # based on the rem length, read variable header
-        remLength = header_component.getRemainingLength()
+            # based on the rem length, read variable header
+            remLength = header_component.getRemainingLength()
 
-        variable_content = binary_to_str(self.conn.recv(remLength))
-        package = self.decoder.decodeVariableComponents(variable_content, header_component)
+            variable_content = binary_to_str(self.conn.recv(remLength))
+            package = self.decoder.decodeVariableComponents(variable_content, header_component)
 
-        return package
+            return package
+
+        except Exception as e:
+            return None
 
 
 class ClientMQTT:
     def __init__(self, addr, logs=False):
+        # initialize Flags
         self.logs_flag = logs
         self.isConnected = False
         self.loop_flag = False
         self.keep_alive = 0
+        self.packedId = 0
+        self.connack_return_code = None
+
+        # establish connection with the broker
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.conn.settimeout(1)
-        self.transmitter = SenderReceiver(self.conn)
 
-        self.packedId = 0
+        # create SenderReceiver object
+        self.transmitter = SenderReceiver(self.conn)
 
         # generate unique client id
         length = random.randint(4, 10)
         letters_and_digits = string.ascii_letters + string.digits
         result_str = ''.join((random.choice(letters_and_digits) for i in range(length)))
-
         self.clientId = result_str
 
         # all callbacks are with the following arguments: topic, message
@@ -86,6 +94,10 @@ class ClientMQTT:
         if self.logs_flag is True:
             print("Broker socket aquired.")
 
+        # condition for returning connect server response
+        self.condition = threading.Condition()
+
+        # initialize using threads
         self.loop_flag = True
         self.keep_alive_flag = False
         self.recv_thread = threading.Thread(target=self.receive_constantly)
@@ -95,9 +107,10 @@ class ClientMQTT:
     def keep_alive_clock(self):
         while self.keep_alive_flag is True:
             wait_time = self.keep_alive / 2
+            step = wait_time / 10
             while wait_time > 0 and self.keep_alive_flag is True:
-                time.sleep(1)
-                wait_time -= 1
+                time.sleep(step)
+                wait_time -= step
 
             if self.keep_alive_flag is True:
                 # print("Ping sent!")
@@ -126,7 +139,7 @@ class ClientMQTT:
         # set the timeout
         done_flag = False
         timeout = 3
-        step = 0.5
+        step = timeout / 10
 
         while done_flag is False:
             index = timeout
@@ -167,10 +180,14 @@ class ClientMQTT:
                     # print("Received Package Type = " + package.getType())
                     # displayControlPackageBinary(package)
 
+                    if not isinstance(package_recv, IControlPackage):
+                        continue
+
                     package_type = package_recv.getType()
 
                     # CONNACK PACKAGE
                     if package_type == 2:
+                        self.condition.acquire()
                         return_code = package_recv.getVariableHeader().getField("connect_return_code")
 
                         if return_code == 0:
@@ -185,6 +202,10 @@ class ClientMQTT:
                         else:
                             if self.logs_flag is True:
                                 print("Connection failed! Return code = " + str(return_code))
+
+                        self.connack_return_code = return_code
+                        self.condition.notify()
+                        self.condition.release()
 
                     # PUBLISH PACKAGE
                     if package_type == 3:
@@ -395,12 +416,12 @@ class ClientMQTT:
                 except Exception as ex:
                     if "An established connection was aborted by the software in your host machine" in str(ex):
                         print("\tException: " + str(ex))
-                        exit(-1)
-                    if "string index out of range" in str(ex):
-                        print("\tException: " + str(ex))
-                        exit(-1)
+                    # if "string index out of range" in str(ex):
+                    #     print("\tException: " + str(ex))
+                    #     exit(-1)
                     if "timed out" not in str(ex):
                         print("\tException: " + str(ex))
+                    raise ex
 
     def connect(self, flags, keep_alive, username='', password='', willTopic='', willMessage=''):
 
@@ -421,6 +442,20 @@ class ClientMQTT:
 
         # send a connect package
         self.transmitter.sendPackage(connectPackage)
+
+        self.condition.acquire()
+
+        # waiting for an answer
+        self.condition.wait(timeout=10)
+
+        tmp_return = self.connack_return_code
+        self.connack_return_code = None
+        self.condition.release()
+
+        # returning the answer
+        if tmp_return is None:
+            return -1
+        return tmp_return
 
     # callback must have a parameter for the packet received!
     def subscribe(self, topics, QoS, callback):
@@ -461,13 +496,13 @@ class ClientMQTT:
         # trimiterea pachetului de unsubscribe
         self.transmitter.sendPackage(unsubscribePackage)
 
-    def publish(self, topic, message, QoS):
+    def publish(self, topic, message, QoS, retain=0):
         self.packedId += 1
 
         # create connect package
         builder = PublishBuilder()
         builder.reset()
-        builder.buildFixedHeader(DUP=0, QoS=QoS, RETAIN=0)
+        builder.buildFixedHeader(DUP=0, QoS=QoS, RETAIN=retain)
         builder.buildVariableHeader(topic=topic, packetId=self.packedId)
         builder.buildPayload(message)
 
@@ -525,14 +560,30 @@ if __name__ == "__main__":
     port = 1883
     address = (ip, port)
 
-    username = input("Username = ")
-
-    client = ClientMQTT(address)
-    client.connect(flags="10000100", keep_alive=90, username=username, willTopic="/register",
-                   willMessage="[" + username + "]:disconnected")
-
+    # connecting ...
+    client = None
+    out = False
     while True:
-        try:
+        username = input("Username = ")
+        password = input("Password = ")
+        client = ClientMQTT(address, logs=True)
+        return_code = client.connect(flags="11110110", keep_alive=90, username=username, password=password,
+                                     willTopic="/register",
+                                     willMessage="[" + username + "]:LAST_WILL(disconnected)")
+        if return_code == -1:
+            print("Invalid connect package parameters!")
+            out = True
+            break
+
+        else:
+            if return_code != 0:
+                print("Invalid user or pasword!")
+            else:
+                break
+
+    if not out:
+        # execute commands ...
+        while True:
             command = input("$: ")
             if command == "subscribe" or command == "s":
                 nr_topics = input("\t$nr of topics: ")
@@ -552,8 +603,11 @@ if __name__ == "__main__":
             if command == "publish" or command == "p":
                 topic = input("\t$topic: ")
                 qos = int(input("\t$qos: "))
+                retain = 0
+                if qos > 0:
+                    retain = int(input("\tretain: "))
                 message = input("\t$message: ")
-                client.publish(topic, message, qos)
+                client.publish(topic, message, qos, retain)
 
             if command == "topics" or command == "t":
                 print("Topics: " + str(client.topic_callbacks.keys()))
@@ -561,5 +615,3 @@ if __name__ == "__main__":
             if command == "disconnect" or command == "d":
                 client.disconnect()
                 break
-        except Exception as e:
-            print(e)
