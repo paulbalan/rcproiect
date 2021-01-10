@@ -53,7 +53,8 @@ class SenderReceiver:
 
 
 class ClientMQTT:
-    def __init__(self, addr):
+    def __init__(self, addr, logs=False):
+        self.logs_flag = logs
         self.isConnected = False
         self.loop_flag = False
         self.keep_alive = 0
@@ -79,9 +80,11 @@ class ClientMQTT:
         # used for storing the topics for each publish with qos = 2
         self.stored_topics = {}
 
-        print("Client trying to get the Broker socket ...")
+        if self.logs_flag is True:
+            print("Client trying to get the Broker socket ...")
         self.conn.connect(addr)
-        print("Broker socket aquired.")
+        if self.logs_flag is True:
+            print("Broker socket aquired.")
 
         self.loop_flag = True
         self.keep_alive_flag = False
@@ -149,7 +152,8 @@ class ClientMQTT:
             # check the exist_flag
             if exist_flag is True:
                 # we need to resend the package
-                print("Due to timeout, resend: " + str(unconfirmed_package.getType()) + " package type")
+                if self.logs_flag is True:
+                    print("Due to timeout, resend: " + str(unconfirmed_package.getType()) + " package type")
                 self.transmitter.sendPackage(unconfirmed_package)
             else:
                 done_flag = True
@@ -170,7 +174,8 @@ class ClientMQTT:
                         return_code = package_recv.getVariableHeader().getField("connect_return_code")
 
                         if return_code == 0:
-                            print("Conected successfully!")
+                            if self.logs_flag is True:
+                                print("Conected successfully!")
                             # set keep alive thread
                             if self.keep_alive != 0:
                                 # self.conn.settimeout(self.keep_alive)
@@ -178,7 +183,8 @@ class ClientMQTT:
                                 self.ping_thread.start()
 
                         else:
-                            print("Connection failed! Return code = " + str(return_code))
+                            if self.logs_flag is True:
+                                print("Connection failed! Return code = " + str(return_code))
 
                     # PUBLISH PACKAGE
                     if package_type == 3:
@@ -194,9 +200,6 @@ class ClientMQTT:
                         packet_id_string = str(packet_id)
 
                         packet_DUP = ((package_recv.getFixedHeader().getFlags() & 8) > 0)
-                        print("Received Publish[" + packet_id_string + "](DUP=" + str(
-                            packet_DUP) + ", QoS=" + str(packet_qos) + "):   [" + packet_topic + "]: \""
-                              + packet_message + "\"")
 
                         if packet_topic in self.topic_callbacks.keys():
                             # get required information
@@ -252,7 +255,8 @@ class ClientMQTT:
                     # PUBACK PACKAGE
                     if package_type == 4:
                         packet_id = package_recv.getVariableHeader().getField('packet_id')
-                        print("Received PUBACK[" + str(packet_id) + "]")
+                        if self.logs_flag is True:
+                            print("Received PUBACK[" + str(packet_id) + "]")
 
                         if packet_id in self.unconfirmed.keys():
                             # daca este un publish in lista
@@ -263,7 +267,9 @@ class ClientMQTT:
                     # PUBREC PACKAGE
                     if package_type == 5:
                         packet_id = package_recv.getVariableHeader().getField('packet_id')
-                        print("Received PUBREC[" + str(packet_id) + "]")
+
+                        if self.logs_flag is True:
+                            print("Received PUBREC[" + str(packet_id) + "]")
 
                         if packet_id in self.unconfirmed.keys():
                             # daca este un publish
@@ -288,7 +294,8 @@ class ClientMQTT:
                     # PUBREL
                     if package_type == 6:
                         packet_id = package_recv.getVariableHeader().getField('packet_id')
-                        print("Received PUBREL[" + str(packet_id) + "]")
+                        if self.logs_flag is True:
+                            print("Received PUBREL[" + str(packet_id) + "]")
 
                         if packet_id in self.unconfirmed.keys():
                             # daca este un pubrel
@@ -319,7 +326,8 @@ class ClientMQTT:
                     # PUBCOMP
                     if package_type == 7:
                         packet_id = package_recv.getVariableHeader().getField('packet_id')
-                        print("Received PUBCOMP[" + str(packet_id) + "]")
+                        if self.logs_flag is True:
+                            print("Received PUBCOMP[" + str(packet_id) + "]")
 
                         if packet_id in self.unconfirmed.keys():
                             # daca este un pubrel
@@ -344,12 +352,16 @@ class ClientMQTT:
 
                             for index in range(0, len(topics)):
                                 return_code = package_recv.getPayload().getField("return_code_" + str(index))
-                                print("Trying to subscribe to " + str(topics[index]) + "...")
+
+                                if self.logs_flag is True:
+                                    print("Trying to subscribe to " + str(topics[index]) + "...")
                                 if return_code == 0x80:
-                                    print("\tResult = FAILURE")
+                                    if self.logs_flag is True:
+                                        print("\tResult = FAILURE")
                                 else:
-                                    print("\tResult = SUCCESS")
-                                    print("\tQos admitted = " + str(return_code))
+                                    if self.logs_flag is True:
+                                        print("\tResult = SUCCESS")
+                                        print("\tQos admitted = " + str(return_code))
                                     self.topic_callbacks[topics[index]] = (callback, return_code)
                                     # print("Current callbacks: " + str(self.topic_callbacks))
                             # I treated the package, now there is no need for it so i can delete it
@@ -367,7 +379,8 @@ class ClientMQTT:
                                 topics.append(self.unconfirmed.get(packet_id).getPayload().getField(
                                     "topic_content_" + str(index)))
 
-                            print("\nUnsubcribe sucessful to ", topics)
+                            if self.logs_flag is True:
+                                print("\nUnsubcribe sucessful to ", topics)
 
                             for topic in topics:
                                 del self.topic_callbacks[topic]
@@ -400,7 +413,8 @@ class ClientMQTT:
                              willTopic=willTopic)
         connectPackage = builder.getPackage()
 
-        print("Connecting as " + username + " ...")
+        if self.logs_flag is True:
+            print("Connecting as " + username + " ...")
         # print(str(connectPackage))
         # displayControlPackageBinary(self.transmitter.encoder.encode(connectPackage))
         self.keep_alive = keep_alive
@@ -439,7 +453,8 @@ class ClientMQTT:
         builder.buildPayload(topics)
         unsubscribePackage = builder.getPackage()
 
-        print("Trying to unsubscribe to ", topics)
+        if self.logs_flag is True:
+            print("Trying to unsubscribe to ", topics)
 
         self.unconfirmed.update({self.packedId: unsubscribePackage})
 
@@ -457,8 +472,10 @@ class ClientMQTT:
         builder.buildPayload(message)
 
         publishPackage = builder.getPackage()
-        print("Publish[" + str(self.packedId) + "] sent:")
-        print("\t[" + topic + "]: \"" + message + "\"")
+
+        if self.logs_flag is True:
+            print("Publish[" + str(self.packedId) + "] sent:")
+            print("\t[" + topic + "]: \"" + message + "\"")
         self.transmitter.sendPackage(publishPackage)
 
         # prepearing the thread that assures the resending of the message if there was a problem
@@ -484,7 +501,9 @@ class ClientMQTT:
             self.ping_thread.join()
 
         self.transmitter.sendPackage(disconnectPackage)
-        print("Client disconnected!")
+
+        if self.logs_flag is True:
+            print("Client disconnected!")
 
 
 def people_entered(topic_name, publish_message):
